@@ -4,14 +4,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
     <title>TCC Cyber Security Course Planner</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="stylesheet" href="styles.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" 
-            integrity="sha384-25c9ec8d43cfca59dad6cd5fbe2d6ed765f9aa363938be7a8b24a1ef915db6bc213bf4965e0323a15a9c2b220858e2e4" 
-            crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+        integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk"
+        crossorigin="anonymous"></script>
 </head>
 
 <body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
     <div class="container">
         <header>
             <h1>Tidewater Community College</h1>
@@ -19,85 +22,153 @@
             <p class="subtitle">Plan your courses and track prerequisites</p>
         </header>
 
-        <div class="controls">
-            <button id="saveBtn" class="btn btn-primary">Save Plan</button>
-            <button id="loadBtn" class="btn btn-secondary">Load Plan</button>
-            <button id="resetBtn" class="btn btn-secondary">Reset to Default</button>
-            <button id="clearBtn" class="btn btn-danger">Clear All</button>
-            <div class="credits-display">
+        <nav class="controls" role="toolbar" aria-label="Plan controls">
+            <button id="saveBtn" class="btn btn-primary" disabled aria-label="Create PDF of your completed plan"
+                aria-describedby="saveBtn-desc">
+                Create PDF
+            </button>
+            <span id="saveBtn-desc" class="sr-only">Button is disabled until all required courses and electives are
+                selected</span>
+            <button id="resetBtn" class="btn btn-secondary" aria-label="Reset plan to default curriculum">Reset to
+                Default</button>
+            <button id="clearBtn" class="btn btn-danger" aria-label="Clear all courses from plan">Clear All</button>
+            <div class="theme-selector-container">
+                <label for="themeSelect" class="sr-only">Select theme</label>
+                <select id="themeSelect" class="btn btn-secondary theme-select" aria-label="Select color theme">
+                    <option value="system">🌐 System</option>
+                    <option value="light">☀️ Light</option>
+                    <option value="dark">🌙 Dark</option>
+                    <option value="solarized-light">☀️ Solarized Light</option>
+                    <option value="solarized-dark">🌙 Solarized Dark</option>
+                    <option value="high-contrast">⚡ High Contrast</option>
+                </select>
+            </div>
+            <div class="credits-display" role="status" aria-live="polite" aria-atomic="true">
                 <strong>Total Credits: <span id="totalCredits">0</span></strong>
             </div>
-        </div>
+        </nav>
 
-        <div class="main-content">
+        <main id="main-content" class="main-content" role="main">
             <div class="left-column">
-                <div class="semesters-container" id="semestersContainer">
-                    <div class="semester" data-semester="1">
+                <div class="semesters-container" id="semestersContainer" role="region"
+                    aria-label="Semester course plans">
+                    <div class="semester" data-semester="1" role="group" aria-labelledby="semester-1-heading">
                         <div class="semester-header">
-                            <h3>Semester 1 <span class="semester-date">(Fall 2025)</span></h3>
-                            <span class="credits">Credits: <span class="semester-credits">0</span></span>
+                            <h3 id="semester-1-heading">Semester 1 <span class="semester-date">(Fall 2025)</span></h3>
+                            <span class="credits" aria-label="Semester 1 credits">Credits: <span
+                                    class="semester-credits" aria-live="polite">0</span></span>
                         </div>
-                        <div class="courses-list" data-semester="1"></div>
+                        <div class="courses-list" data-semester="1" role="list" aria-label="Courses for Semester 1"
+                            tabindex="0"></div>
                     </div>
 
-                    <div class="semester" data-semester="2">
+                    <div class="semester" data-semester="2" role="group" aria-labelledby="semester-2-heading">
                         <div class="semester-header">
-                            <h3>Semester 2 <span class="semester-date">(Spring 2026)</span></h3>
-                            <span class="credits">Credits: <span class="semester-credits">0</span></span>
+                            <h3 id="semester-2-heading">Semester 2 <span class="semester-date">(Spring 2026)</span></h3>
+                            <span class="credits" aria-label="Semester 2 credits">Credits: <span
+                                    class="semester-credits" aria-live="polite">0</span></span>
                         </div>
-                        <div class="courses-list" data-semester="2"></div>
+                        <div class="courses-list" data-semester="2" role="list" aria-label="Courses for Semester 2"
+                            tabindex="0"></div>
                     </div>
 
-                    <div class="semester" data-semester="3">
+                    <div class="semester" data-semester="3" role="group" aria-labelledby="semester-3-heading">
                         <div class="semester-header">
-                            <h3>Semester 3 <span class="semester-date">(Summer 2026)</span></h3>
-                            <span class="credits">Credits: <span class="semester-credits">0</span></span>
+                            <h3 id="semester-3-heading">Semester 3 <span class="semester-date">(Summer 2026)</span></h3>
+                            <span class="credits" aria-label="Semester 3 credits">Credits: <span
+                                    class="semester-credits" aria-live="polite">0</span></span>
                         </div>
-                        <div class="courses-list" data-semester="3"></div>
+                        <div class="courses-list" data-semester="3" role="list" aria-label="Courses for Semester 3"
+                            tabindex="0"></div>
                     </div>
 
-                    <div class="semester" data-semester="4">
+                    <div class="semester" data-semester="4" role="group" aria-labelledby="semester-4-heading">
                         <div class="semester-header">
-                            <h3>Semester 4 <span class="semester-date">(Fall 2026)</span></h3>
-                            <span class="credits">Credits: <span class="semester-credits">0</span></span>
+                            <h3 id="semester-4-heading">Semester 4 <span class="semester-date">(Fall 2026)</span></h3>
+                            <span class="credits" aria-label="Semester 4 credits">Credits: <span
+                                    class="semester-credits" aria-live="polite">0</span></span>
                         </div>
-                        <div class="courses-list" data-semester="4"></div>
+                        <div class="courses-list" data-semester="4" role="list" aria-label="Courses for Semester 4"
+                            tabindex="0"></div>
                     </div>
                 </div>
                 <div class="add-semester-container">
-                    <button id="addSemesterBtn" class="btn btn-secondary">+ Add Semester</button>
+                    <button id="addSemesterBtn" class="btn btn-secondary"
+                        aria-label="Add an additional semester to your plan">+ Add Semester</button>
                 </div>
             </div>
 
-            <div class="courses-panel">
+            <aside class="courses-panel" role="complementary" aria-label="Available courses">
                 <h3>Available Courses</h3>
                 <div class="search-box">
-                    <input type="text" id="courseSearch" placeholder="Search courses...">
+                    <label for="courseSearch" class="sr-only">Search for courses</label>
+                    <input type="text" id="courseSearch" placeholder="Search courses..." aria-label="Search courses"
+                        autocomplete="off">
                 </div>
-                <div class="courses-grid" id="coursesGrid"></div>
-            </div>
-        </div>
+                <p class="keyboard-instructions sr-only" id="keyboardInstructions">
+                    To add a course: Use Tab to navigate to a course card, then press Enter or Space to select a
+                    semester.
+                    You can also drag and drop courses between semesters.
+                </p>
+                <div class="courses-grid" id="coursesGrid" role="list" aria-label="Available courses list"
+                    aria-describedby="keyboardInstructions"></div>
+            </aside>
+        </main>
 
-        <div id="prerequisiteModal" class="modal">
+        <div id="prerequisiteModal" class="modal" role="dialog" aria-labelledby="prerequisiteModal-title"
+            aria-modal="true" aria-hidden="true">
             <div class="modal-content">
-                <span class="close">&times;</span>
-                <h3>Prerequisites Required</h3>
+                <button class="close" aria-label="Close prerequisite warning dialog">&times;</button>
+                <h3 id="prerequisiteModal-title">Prerequisites Required</h3>
                 <p id="prerequisiteMessage"></p>
-                <div id="missingPrerequisites"></div>
+                <div id="missingPrerequisites" role="list"></div>
             </div>
         </div>
 
-        <div id="mathUpgradeModal" class="modal">
+        <div id="mathUpgradeModal" class="modal" role="dialog" aria-labelledby="mathUpgradeModal-title"
+            aria-modal="true" aria-hidden="true">
             <div class="modal-content">
-                <span class="close">&times;</span>
-                <h3>Upgrade Math Course</h3>
+                <button class="close" aria-label="Close math upgrade dialog">&times;</button>
+                <h3 id="mathUpgradeModal-title">Upgrade Math Course</h3>
                 <p>Select a higher level math course to replace MTH 161:</p>
-                <div id="mathUpgradeOptions"></div>
+                <div id="mathUpgradeOptions" role="listbox" aria-label="Available math courses"></div>
             </div>
         </div>
+
+        <div id="live-region" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
     </div>
 
+    <footer role="contentinfo" aria-label="Site footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h4>About This Tool</h4>
+                <p>This course planning tool is designed to help students plan their Associate of Applied Science: Cyber Security (345) degree at Tidewater Community College.</p>
+            </div>
+            <div class="footer-section">
+                <h4>Important Information</h4>
+                <ul>
+                    <li>This tool is for planning purposes only</li>
+                    <li>Always verify course requirements with your academic advisor</li>
+                    <li>Course availability may vary by semester</li>
+                    <li>Refer to the <a href="https://catalog.tcc.edu/preview_program.php?catoid=21&poid=4903" target="_blank" rel="noopener noreferrer">official TCC catalog</a> for current requirements</li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h4>Accessibility</h4>
+                <p>This site is designed to meet <abbr title="Web Content Accessibility Guidelines">WCAG</abbr> 2.1 Level AA standards and Section 508 requirements. If you encounter any accessibility issues, please contact your academic advisor.</p>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; <span id="currentYear"></span> Joel Kirch. This tool is provided as-is for educational planning purposes.</p>
+            <p class="footer-license">Licensed under <a href="LICENSE" target="_blank" rel="noopener noreferrer">GNU General Public License v3.0</a></p>
+        </div>
+    </footer>
+
     <script src="app.js"></script>
+    <script>
+        // Set current year in footer
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+    </script>
 </body>
 
 </html>

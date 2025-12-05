@@ -1,3 +1,6 @@
+// Track which math course is currently shown in Available Courses (defaults to MTH 161)
+let currentMathCourse = 'MTH 161';
+
 // Utility function to escape HTML
 function escapeHtml(text) {
     if (typeof text !== 'string') return '';
@@ -13,9 +16,9 @@ function isValidSemesterNumber(num) {
 
 // Utility function to validate course code
 function isValidCourseCode(code) {
-    return typeof code === 'string' && 
-           /^[A-Z]{2,4} \d{3}$/.test(code) &&
-           courses.hasOwnProperty(code);
+    return typeof code === 'string' &&
+        /^[A-Z]{2,4} \d{3}$/.test(code) &&
+        courses.hasOwnProperty(code);
 }
 
 // Course data with prerequisites
@@ -531,44 +534,114 @@ function isPlanComplete() {
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
-    renderCourses();
-    setupEventListeners();
-    loadFromStorage(false); // Load silently on first load
+    try {
+        // Setup event listeners first
+        if (typeof setupEventListeners === 'function') {
+            setupEventListeners();
+        }
+
+        // Load theme preference (after event listeners are set up)
+        if (typeof loadTheme === 'function') {
+            loadTheme();
+        }
+
+        // Setup system theme listener
+        if (typeof setupSystemThemeListener === 'function') {
+            setupSystemThemeListener();
+        }
+
+        // Load saved plan
+        if (typeof loadFromStorage === 'function') {
+            loadFromStorage(false); // Load silently on first load
+        }
+
+        // Render courses after loading
+        if (typeof renderCourses === 'function') {
+            renderCourses();
+        }
+
+        // Update PDF button state on initial load
+        if (typeof updatePDFButtonState === 'function') {
+            updatePDFButtonState();
+        }
+    } catch (error) {
+        console.error('Error during initialization:', error);
+        alert('An error occurred while loading the page. Please refresh.');
+    }
 });
 
 function setupEventListeners() {
-    // Save/Load/Clear buttons
-    document.getElementById('saveBtn').addEventListener('click', saveToStorage);
-    document.getElementById('loadBtn').addEventListener('click', loadFromStorage);
-    document.getElementById('resetBtn').addEventListener('click', resetToDefault);
-    document.getElementById('clearBtn').addEventListener('click', clearAll);
+    // Save/Clear buttons
+    const saveBtn = document.getElementById('saveBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const clearBtn = document.getElementById('clearBtn');
+
+    if (saveBtn) {
+        saveBtn.addEventListener('click', saveToStorage);
+    }
+    if (resetBtn) {
+        resetBtn.addEventListener('click', resetToDefault);
+    }
+    if (clearBtn) {
+        clearBtn.addEventListener('click', clearAll);
+    }
+
+    // Theme selector
+    const themeSelect = document.getElementById('themeSelect');
+    if (themeSelect) {
+        themeSelect.addEventListener('change', (e) => {
+            setTheme(e.target.value);
+        });
+    }
 
     // Search functionality
-    document.getElementById('courseSearch').addEventListener('input', (e) => {
-        filterCourses(e.target.value);
-    });
+    const courseSearch = document.getElementById('courseSearch');
+    if (courseSearch) {
+        courseSearch.addEventListener('input', (e) => {
+            filterCourses(e.target.value);
+        });
+    }
 
     // Modal close
     // Close button for prerequisite modal
-    document.querySelector('#prerequisiteModal .close').addEventListener('click', () => {
-        document.getElementById('prerequisiteModal').classList.remove('show');
-    });
+    const prereqCloseBtn = document.querySelector('#prerequisiteModal .close');
+    if (prereqCloseBtn) {
+        prereqCloseBtn.addEventListener('click', () => {
+            closeModal('prerequisiteModal');
+        });
+    }
 
     // Close button for math upgrade modal
-    document.querySelector('#mathUpgradeModal .close').addEventListener('click', () => {
-        document.getElementById('mathUpgradeModal').classList.remove('show');
+    const mathCloseBtn = document.querySelector('#mathUpgradeModal .close');
+    if (mathCloseBtn) {
+        mathCloseBtn.addEventListener('click', () => {
+            closeModal('mathUpgradeModal');
+        });
+    }
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const prerequisiteModal = document.getElementById('prerequisiteModal');
+            const mathUpgradeModal = document.getElementById('mathUpgradeModal');
+            if (prerequisiteModal.classList.contains('show')) {
+                closeModal('prerequisiteModal');
+            } else if (mathUpgradeModal.classList.contains('show')) {
+                closeModal('mathUpgradeModal');
+            }
+        }
     });
 
     // Close modal when clicking outside
     window.addEventListener('click', (e) => {
         const prerequisiteModal = document.getElementById('prerequisiteModal');
         if (e.target === prerequisiteModal) {
-            prerequisiteModal.classList.remove('show');
+            closeModal('prerequisiteModal');
         }
 
         const mathUpgradeModal = document.getElementById('mathUpgradeModal');
         if (e.target === mathUpgradeModal) {
-            mathUpgradeModal.classList.remove('show');
+            closeModal('mathUpgradeModal');
         }
     });
 
@@ -576,7 +649,10 @@ function setupEventListeners() {
     setupDragAndDrop();
 
     // Add semester button
-    document.getElementById('addSemesterBtn').addEventListener('click', addNewSemester);
+    const addSemesterBtn = document.getElementById('addSemesterBtn');
+    if (addSemesterBtn) {
+        addSemesterBtn.addEventListener('click', addNewSemester);
+    }
 }
 
 
@@ -789,14 +865,19 @@ function hasElectiveSelected(category) {
 
 function renderCourses() {
     const coursesGrid = document.getElementById('coursesGrid');
-    coursesGrid.innerHTML = '';
+    if (!coursesGrid) {
+        console.error('coursesGrid element not found');
+        return;
+    }
+
+    coursesGrid.textContent = '';
 
     // If plan is complete, hide all courses
     if (isPlanComplete()) {
         const completeMsg = document.createElement('div');
         completeMsg.className = 'plan-complete-message';
         completeMsg.textContent = '🎉 Your plan is complete! All required courses and electives have been selected.';
-        coursesGrid.innerHTML = '';
+        coursesGrid.textContent = '';
         coursesGrid.appendChild(completeMsg);
         return;
     }
@@ -805,11 +886,19 @@ function renderCourses() {
     const hasITElective = hasElectiveSelected('it_elective');
     const completedCourses = getAllCompletedCourses();
 
+    // Verify courses object exists
+    if (!courses || typeof courses !== 'object') {
+        console.error('Courses object not found or invalid');
+        return;
+    }
+
     // Show only one math course in Available Courses (the current one, default MTH 161)
     const mathCourseToShow = courses[currentMathCourse];
     if (mathCourseToShow && !completedCourses.includes(currentMathCourse)) {
         const courseCard = createCourseCard(mathCourseToShow);
-        coursesGrid.appendChild(courseCard);
+        if (courseCard) {
+            coursesGrid.appendChild(courseCard);
+        }
     }
 
     Object.values(courses).forEach(course => {
@@ -834,8 +923,21 @@ function renderCourses() {
         }
 
         const courseCard = createCourseCard(course);
-        coursesGrid.appendChild(courseCard);
+        if (courseCard && coursesGrid) {
+            coursesGrid.appendChild(courseCard);
+        }
     });
+
+    // Debug: Log if no courses were added
+    if (coursesGrid.children.length === 0) {
+        console.log('No courses rendered. Debug info:', {
+            completedCourses,
+            hasHumanities,
+            hasITElective,
+            currentMathCourse,
+            totalCourses: Object.keys(courses).length
+        });
+    }
 }
 
 function createCourseCard(course) {
@@ -865,8 +967,18 @@ function createCourseCard(course) {
 
     const isLocked = !hasAllPrerequisites;
 
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+    const keyboardHint = !isLocked ? ' Press Enter or Space to add to a semester, or drag to move.' : '';
+    card.setAttribute('aria-label', `${course.code}: ${course.title}, ${course.credits} credits.${keyboardHint}`);
+    card.setAttribute('title', !isLocked ? 'Click to add, or drag to move. Keyboard: Press Enter or Space.' : 'Prerequisites not met');
+
     if (isLocked) {
         card.classList.add('locked');
+        card.setAttribute('aria-disabled', 'true');
+        card.setAttribute('aria-label', `${card.getAttribute('aria-label')} - Locked: Prerequisites not met`);
+    } else {
+        card.setAttribute('aria-disabled', 'false');
     }
 
     // Add category class for styling
@@ -927,24 +1039,24 @@ function createCourseCard(course) {
 
     // Build card content safely
     card.appendChild(categoryBadge ? document.createRange().createContextualFragment(categoryBadge) : document.createDocumentFragment());
-    
+
     const codeDiv = document.createElement('div');
     codeDiv.className = 'course-code';
     codeDiv.textContent = course.code;
     card.appendChild(codeDiv);
-    
+
     const titleDiv = document.createElement('div');
     titleDiv.className = 'course-title';
     titleDiv.textContent = course.title;
     card.appendChild(titleDiv);
-    
+
     const creditsDiv = document.createElement('div');
     creditsDiv.className = 'course-credits';
     creditsDiv.textContent = `${course.credits} Credits`;
     card.appendChild(creditsDiv);
-    
+
     card.appendChild(document.createRange().createContextualFragment(prerequisitesHTML));
-    
+
     // Add upgrade button for the current math course being shown in Available Courses
     if (course.code.startsWith('MTH ') && course.code === currentMathCourse) {
         const upgradeBtn = document.createElement('button');
@@ -975,8 +1087,22 @@ function createCourseCard(course) {
                 showSemesterSelector(course);
             }
         });
+        // Keyboard navigation
+        card.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                showSemesterSelector(course);
+            }
+        });
     } else {
         card.addEventListener('click', () => showPrerequisiteModal(course));
+        // Keyboard navigation for locked courses
+        card.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                showPrerequisiteModal(course);
+            }
+        });
     }
 
     return card;
@@ -986,11 +1112,11 @@ function showSemesterSelector(course) {
     const semesters = Object.keys(studentPlan).map(Number).sort((a, b) => a - b);
     const semesterList = semesters.join(', ');
     const semester = prompt(`Select semester (${semesterList}) to add ${course.code}:\n\nOr enter a new semester number to create it:`);
-    
+
     if (!semester || semester.trim() === '') {
         return;
     }
-    
+
     const semesterNum = parseInt(semester.trim(), 10);
 
     if (isValidSemesterNumber(semesterNum)) {
@@ -1004,10 +1130,10 @@ function showSemesterSelector(course) {
                 const semesterDiv = document.createElement('div');
                 semesterDiv.className = 'semester';
                 semesterDiv.dataset.semester = semesterNum;
-                
+
                 const headerDiv = document.createElement('div');
                 headerDiv.className = 'semester-header';
-                
+
                 const h3 = document.createElement('h3');
                 h3.textContent = `Semester ${semesterNum} `;
                 const dateSpan = document.createElement('span');
@@ -1015,26 +1141,30 @@ function showSemesterSelector(course) {
                 dateSpan.textContent = `(${getSemesterName(semesterNum)})`;
                 h3.appendChild(dateSpan);
                 headerDiv.appendChild(h3);
-                
+
                 const creditsSpan = document.createElement('span');
                 creditsSpan.className = 'credits';
-                creditsSpan.innerHTML = 'Credits: <span class="semester-credits">0</span>';
+                creditsSpan.textContent = 'Credits: ';
+                const creditsValue = document.createElement('span');
+                creditsValue.className = 'semester-credits';
+                creditsValue.textContent = '0';
+                creditsSpan.appendChild(creditsValue);
                 headerDiv.appendChild(creditsSpan);
-                
+
                 const removeBtn = document.createElement('button');
                 removeBtn.className = 'remove-semester-btn';
                 removeBtn.textContent = '×';
                 removeBtn.title = 'Remove semester';
                 removeBtn.addEventListener('click', () => removeSemester(semesterNum));
                 headerDiv.appendChild(removeBtn);
-                
+
                 semesterDiv.appendChild(headerDiv);
-                
+
                 const coursesList = document.createElement('div');
                 coursesList.className = 'courses-list';
                 coursesList.dataset.semester = semesterNum;
                 semesterDiv.appendChild(coursesList);
-                
+
                 semestersContainer.insertBefore(semesterDiv, addSemesterContainer);
 
                 // Setup drag and drop
@@ -1065,6 +1195,9 @@ function showPrerequisiteModal(course, targetSemester = null) {
     const message = document.getElementById('prerequisiteMessage');
     const missingDiv = document.getElementById('missingPrerequisites');
 
+    // Clear previous content
+    missingDiv.textContent = '';
+
     message.textContent = `You cannot add ${course.code} until you complete the following prerequisites:`;
 
     const missing = getMissingPrerequisites(course.code, targetSemester);
@@ -1075,32 +1208,53 @@ function showPrerequisiteModal(course, targetSemester = null) {
         if (course.prerequisites && course.prerequisites.length > 0) {
             const allPrereqs = course.prerequisites.filter(p => p !== 'Instructor Permission');
             if (allPrereqs.length > 0) {
-                missingDiv.innerHTML = '<ul>' + allPrereqs.map(prereq => {
+                const ul = document.createElement('ul');
+                ul.setAttribute('role', 'list');
+                allPrereqs.forEach(prereq => {
+                    const li = document.createElement('li');
+                    li.setAttribute('role', 'listitem');
                     const prereqSemester = getCourseSemester(prereq);
                     if (prereqSemester !== null && targetSemester !== null && prereqSemester >= targetSemester) {
-                        return `<li>${prereq} (currently in Semester ${prereqSemester})</li>`;
+                        li.textContent = `${prereq} (currently in Semester ${prereqSemester})`;
                     } else {
-                        const completedCourses = getAllCompletedCourses();
-                        if (!completedCourses.includes(prereq)) {
-                            return `<li>${prereq}</li>`;
-                        } else {
-                            return `<li>${prereq}</li>`;
-                        }
+                        li.textContent = prereq;
                     }
-                }).join('') + '</ul>';
+                    ul.appendChild(li);
+                });
+                missingDiv.appendChild(ul);
             } else {
-                missingDiv.innerHTML = '<p>No prerequisites required.</p>';
+                const p = document.createElement('p');
+                p.textContent = 'No prerequisites required.';
+                missingDiv.appendChild(p);
             }
         } else {
-            missingDiv.innerHTML = '<p>No prerequisites required.</p>';
+            const p = document.createElement('p');
+            p.textContent = 'No prerequisites required.';
+            missingDiv.appendChild(p);
         }
     } else {
-        missingDiv.innerHTML = '<ul>' + missing.map(prereq =>
-            `<li>${prereq}</li>`
-        ).join('') + '</ul>';
+        const ul = document.createElement('ul');
+        ul.setAttribute('role', 'list');
+        missing.forEach(prereq => {
+            const li = document.createElement('li');
+            li.setAttribute('role', 'listitem');
+            li.textContent = prereq;
+            ul.appendChild(li);
+        });
+        missingDiv.appendChild(ul);
     }
 
     modal.classList.add('show');
+    modal.setAttribute('aria-hidden', 'false');
+
+    // Focus management
+    const closeBtn = modal.querySelector('.close');
+    if (closeBtn) {
+        closeBtn.focus();
+    }
+
+    // Trap focus in modal
+    trapFocusInModal(modal);
 }
 
 function getMissingPrerequisites(courseCode, targetSemester = null) {
@@ -1285,6 +1439,10 @@ function canAddCourse(courseCode, targetSemester = null) {
 }
 
 function addCourseToSemester(courseCode, semester) {
+    const course = courses[courseCode];
+    if (course) {
+        announceToScreenReader(`${courseCode} added to Semester ${semester}`);
+    }
     // Check if course is already in this semester
     if (studentPlan[semester].includes(courseCode)) {
         alert(`${courseCode} is already in Semester ${semester}`);
@@ -1300,12 +1458,11 @@ function addCourseToSemester(courseCode, semester) {
 
     // Check prerequisites
     if (!canAddCourse(courseCode, semester)) {
-        showPrerequisiteModal(courses[courseCode], semester);
+        showPrerequisiteModal(course, semester);
         return;
     }
 
     // Check credit limit (18 credits per semester) - MUST be before adding
-    const course = courses[courseCode];
     if (!course) {
         alert(`Course ${courseCode} not found.`);
         return;
@@ -1349,6 +1506,10 @@ function getSemesterCredits(semester) {
 }
 
 function removeCourseFromSemester(courseCode, semester) {
+    const course = courses[courseCode];
+    if (course) {
+        announceToScreenReader(`${courseCode} removed from Semester ${semester}`);
+    }
     studentPlan[semester] = studentPlan[semester].filter(code => code !== courseCode);
 
     // Check if removing this course breaks prerequisites for other courses
@@ -1417,6 +1578,9 @@ function updateUI() {
 
     // Update total credits
     updateTotalCredits();
+
+    // Update PDF button state based on plan completion
+    updatePDFButtonState();
 }
 
 function addNewSemester() {
@@ -1437,10 +1601,10 @@ function addNewSemester() {
         const semesterDiv = document.createElement('div');
         semesterDiv.className = 'semester';
         semesterDiv.dataset.semester = nextSemester;
-        
+
         const headerDiv = document.createElement('div');
         headerDiv.className = 'semester-header';
-        
+
         const h3 = document.createElement('h3');
         h3.textContent = `Semester ${nextSemester} `;
         const dateSpan = document.createElement('span');
@@ -1448,21 +1612,25 @@ function addNewSemester() {
         dateSpan.textContent = `(${getSemesterName(nextSemester)})`;
         h3.appendChild(dateSpan);
         headerDiv.appendChild(h3);
-        
+
         const creditsSpan = document.createElement('span');
         creditsSpan.className = 'credits';
-        creditsSpan.innerHTML = 'Credits: <span class="semester-credits">0</span>';
+        creditsSpan.textContent = 'Credits: ';
+        const creditsValue = document.createElement('span');
+        creditsValue.className = 'semester-credits';
+        creditsValue.textContent = '0';
+        creditsSpan.appendChild(creditsValue);
         headerDiv.appendChild(creditsSpan);
-        
+
         const removeBtn = document.createElement('button');
         removeBtn.className = 'remove-semester-btn';
         removeBtn.textContent = '×';
         removeBtn.title = 'Remove semester';
         removeBtn.addEventListener('click', () => removeSemester(nextSemester));
         headerDiv.appendChild(removeBtn);
-        
+
         semesterDiv.appendChild(headerDiv);
-        
+
         const coursesList = document.createElement('div');
         coursesList.className = 'courses-list';
         coursesList.dataset.semester = nextSemester;
@@ -1526,16 +1694,35 @@ function createElectivePlaceholder(category, semester) {
     const credits = category === 'humanities' ? '3' : '3-4';
     const badgeClass = category === 'humanities' ? 'humanities-badge' : 'it-badge';
 
-    placeholder.innerHTML = `
-        <div class="course-info">
-            <div class="course-header-row">
-                <div class="course-code placeholder-text">${categoryName} Elective</div>
-                <span class="category-badge-small ${badgeClass}">${categoryName}</span>
-            </div>
-            <div class="course-title placeholder-text">Click to select ${categoryName.toLowerCase()} elective • Drag to move</div>
-            <div class="course-credits">${credits} Credits</div>
-        </div>
-    `;
+    const placeholderInfo = document.createElement('div');
+    placeholderInfo.className = 'course-info';
+
+    const headerRow = document.createElement('div');
+    headerRow.className = 'course-header-row';
+
+    const codeDiv = document.createElement('div');
+    codeDiv.className = 'course-code placeholder-text';
+    codeDiv.textContent = `${categoryName} Elective`;
+    headerRow.appendChild(codeDiv);
+
+    const badge = document.createElement('span');
+    badge.className = `category-badge-small ${badgeClass}`;
+    badge.textContent = categoryName;
+    headerRow.appendChild(badge);
+
+    placeholderInfo.appendChild(headerRow);
+
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'course-title placeholder-text';
+    titleDiv.textContent = `Click to select ${categoryName.toLowerCase()} elective • Drag to move`;
+    placeholderInfo.appendChild(titleDiv);
+
+    const creditsDiv = document.createElement('div');
+    creditsDiv.className = 'course-credits';
+    creditsDiv.textContent = `${credits} Credits`;
+    placeholderInfo.appendChild(creditsDiv);
+
+    placeholder.appendChild(placeholderInfo);
 
     // Make it draggable
     placeholder.addEventListener('dragstart', handlePlaceholderDragStart);
@@ -1576,13 +1763,13 @@ function showElectiveSelector(category, semester) {
 
     if (selection) {
         const trimmedSelection = selection.trim().toUpperCase();
-        
+
         // Validate course code format
         if (!/^[A-Z]{2,4} \d{3}$/.test(trimmedSelection)) {
             alert('Invalid course code format. Please enter a code like "ART 100".');
             return;
         }
-        
+
         const selectedCourse = availableElectives.find(course =>
             course.code.toUpperCase() === trimmedSelection
         );
@@ -1615,7 +1802,7 @@ function updateSemesterDisplay(semester) {
     const coursesList = document.querySelector(`.courses-list[data-semester="${semester}"]`);
     const creditsSpan = document.querySelector(`.semester[data-semester="${semester}"] .semester-credits`);
 
-    coursesList.innerHTML = '';
+    coursesList.textContent = '';
 
     let semesterCredits = 0;
 
@@ -1637,6 +1824,10 @@ function updateSemesterDisplay(semester) {
         courseItem.draggable = true;
         courseItem.dataset.courseCode = course.code;
         courseItem.dataset.currentSemester = semester;
+        courseItem.setAttribute('role', 'listitem');
+        courseItem.setAttribute('tabindex', '0');
+        courseItem.setAttribute('aria-label', `${course.code}: ${course.title}, ${course.credits} credits in Semester ${semester}. Press Enter or Space to move, or drag to another semester.`);
+        courseItem.setAttribute('title', 'Press Enter or Space to move, or drag to another semester');
 
         if (course.category === 'humanities') {
             courseItem.classList.add('humanities-elective');
@@ -1644,27 +1835,73 @@ function updateSemesterDisplay(semester) {
             courseItem.classList.add('it-elective');
         }
 
+        const courseInfo = document.createElement('div');
+        courseInfo.className = 'course-info';
+
+        const headerRow = document.createElement('div');
+        headerRow.className = 'course-header-row';
+
+        const codeDiv = document.createElement('div');
+        codeDiv.className = 'course-code';
+        codeDiv.textContent = course.code;
+        headerRow.appendChild(codeDiv);
+
+        if (categoryBadge) {
+            headerRow.appendChild(document.createRange().createContextualFragment(categoryBadge));
+        }
+
         // Add upgrade button for the current math course (if it's in Available Courses)
         const completedCoursesForUpgrade = getAllCompletedCourses();
-        const upgradeButton = course.code.startsWith('MTH ') && course.code === currentMathCourse && !completedCoursesForUpgrade.includes(course.code) ?
-            `<button class="upgrade-btn-small" onclick="event.stopPropagation(); showMathUpgradeModal('${course.code}')" title="Or Higher (click to change)">Or Higher</button>` : '';
+        if (course.code.startsWith('MTH ') && course.code === currentMathCourse && !completedCoursesForUpgrade.includes(course.code)) {
+            const upgradeBtn = document.createElement('button');
+            upgradeBtn.className = 'upgrade-btn-small';
+            upgradeBtn.textContent = 'Or Higher';
+            upgradeBtn.title = 'Or Higher (click to change)';
+            upgradeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                showMathUpgradeModal(course.code);
+            });
+            headerRow.appendChild(upgradeBtn);
+        }
 
-        courseItem.innerHTML = `
-            <div class="course-info">
-                <div class="course-header-row">
-                    <div class="course-code">${course.code}</div>
-                    ${categoryBadge}
-                    ${upgradeButton}
-                </div>
-                <div class="course-title">${course.title}</div>
-                <div class="course-credits">${course.credits} Credits</div>
-            </div>
-            <button class="remove-btn" onclick="event.stopPropagation(); removeCourseFromSemester('${course.code}', ${semester})">Remove</button>
-        `;
+        courseInfo.appendChild(headerRow);
+
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'course-title';
+        titleDiv.textContent = course.title;
+        courseInfo.appendChild(titleDiv);
+
+        const creditsDiv = document.createElement('div');
+        creditsDiv.className = 'course-credits';
+        creditsDiv.textContent = `${course.credits} Credits`;
+        courseInfo.appendChild(creditsDiv);
+
+        courseItem.appendChild(courseInfo);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-btn';
+        removeBtn.textContent = 'Remove';
+        removeBtn.setAttribute('aria-label', `Remove ${course.code} from Semester ${semester}`);
+        removeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            removeCourseFromSemester(course.code, semester);
+        });
+        courseItem.appendChild(removeBtn);
 
         // Add drag handlers
         courseItem.addEventListener('dragstart', handleDragStart);
         courseItem.addEventListener('dragend', handleDragEnd);
+
+        // Keyboard navigation for course items in semesters
+        courseItem.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.stopPropagation();
+                // Show semester selector to move course
+                // Note: showSemesterSelector will handle the case where course is already in a semester
+                showSemesterSelector(course);
+            }
+        });
 
         coursesList.appendChild(courseItem);
     });
@@ -1686,7 +1923,7 @@ function updateSemesterDisplay(semester) {
         const emptyMsg = document.createElement('div');
         emptyMsg.className = 'empty-semester';
         emptyMsg.textContent = 'No courses added yet';
-        coursesList.innerHTML = '';
+        coursesList.textContent = '';
         coursesList.appendChild(emptyMsg);
     }
 
@@ -1763,131 +2000,161 @@ function filterCourses(searchTerm) {
 }
 
 function saveToStorage() {
+    // Check if plan is complete before allowing PDF creation
+    if (!isPlanComplete()) {
+        alert('Please complete your plan before creating a PDF. All required courses and electives must be selected.');
+        return;
+    }
+
     try {
+        // Still save to localStorage for persistence
         localStorage.setItem('cyberplan_studentPlan', JSON.stringify(studentPlan));
         localStorage.setItem('cyberplan_placeholderPositions', JSON.stringify(placeholderPositions));
         localStorage.setItem('cyberplan_currentMathCourse', currentMathCourse);
 
         // Generate PDF
-        generatePDF();
+        const pdfGenerated = generatePDF();
 
-        alert('Plan saved successfully! PDF downloaded.');
+        if (pdfGenerated) {
+            alert('PDF created successfully!');
+        } else {
+            alert('PDF generation failed. Please refresh the page and try again.');
+        }
     } catch (e) {
-        alert('Error saving plan: ' + e.message);
+        alert('Error creating PDF: ' + e.message);
     }
 }
 
 function generatePDF() {
-    if (!window.jspdf || !window.jspdf.jsPDF) {
-        alert('PDF library not loaded. Please refresh the page and try again.');
-        return;
+    // Check for jsPDF library - it might be loaded as window.jspdf or just available globally
+    let jsPDF;
+    if (window.jspdf && window.jspdf.jsPDF) {
+        jsPDF = window.jspdf.jsPDF;
+    } else if (window.jsPDF) {
+        jsPDF = window.jsPDF;
+    } else {
+        console.error('jsPDF library not found. Available:', Object.keys(window).filter(k => k.toLowerCase().includes('pdf')));
+        return false;
     }
-    
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
 
-    // Header
-    doc.setFontSize(18);
-    doc.setFont(undefined, 'bold');
-    doc.text('Tidewater Community College', 105, 20, { align: 'center' });
+    try {
+        const doc = new jsPDF();
 
-    doc.setFontSize(14);
-    doc.setFont(undefined, 'normal');
-    doc.text('Associate of Applied Science: Cyber Security (345)', 105, 28, { align: 'center' });
+        // Header
+        doc.setFontSize(18);
+        doc.setFont(undefined, 'bold');
+        doc.text('Tidewater Community College', 105, 20, { align: 'center' });
 
-    doc.setFontSize(10);
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 105, 35, { align: 'center' });
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'normal');
+        doc.text('Associate of Applied Science: Cyber Security (345)', 105, 28, { align: 'center' });
 
-    // Get all semesters sorted
-    const semesters = Object.keys(studentPlan).map(Number).sort((a, b) => a - b);
+        doc.setFontSize(10);
+        doc.text(`Generated: ${new Date().toLocaleDateString()}`, 105, 35, { align: 'center' });
 
-    let yPos = 45;
-    const pageHeight = doc.internal.pageSize.height;
-    const margin = 20;
-    const lineHeight = 7;
+        // Get all semesters sorted
+        const semesters = Object.keys(studentPlan).map(Number).sort((a, b) => a - b);
 
-    // Calculate total credits
-    let totalCredits = 0;
+        let yPos = 45;
+        const pageHeight = doc.internal.pageSize.height;
+        const margin = 20;
+        const lineHeight = 7;
 
-    semesters.forEach((semesterNum) => {
-        const semesterCourses = studentPlan[semesterNum] || [];
-        const semesterCredits = getSemesterCredits(semesterNum);
-        totalCredits += semesterCredits;
+        // Calculate total credits
+        let totalCredits = 0;
 
-        // Check if we need a new page
-        if (yPos > pageHeight - 50) {
+        semesters.forEach((semesterNum) => {
+            const semesterCourses = studentPlan[semesterNum] || [];
+            const semesterCredits = getSemesterCredits(semesterNum);
+            totalCredits += semesterCredits;
+
+            // Check if we need a new page
+            if (yPos > pageHeight - 50) {
+                doc.addPage();
+                yPos = 20;
+            }
+
+            // Semester header
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            const semesterName = getSemesterName(semesterNum);
+            doc.text(`Semester ${semesterNum} (${semesterName})`, margin, yPos);
+
+            yPos += lineHeight;
+
+            // Courses in this semester
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+
+            if (semesterCourses.length === 0) {
+                doc.text('  No courses scheduled', margin + 5, yPos);
+                yPos += lineHeight;
+            } else {
+                semesterCourses.forEach((courseCode) => {
+                    const course = courses[courseCode];
+                    if (course) {
+                        const categoryBadge = course.category === 'humanities' ? '[H]' :
+                            course.category === 'it_elective' ? '[IT]' : '';
+                        const courseText = `${courseCode} - ${course.title} (${course.credits} credits) ${categoryBadge}`;
+                        doc.text(courseText, margin + 5, yPos);
+                        yPos += lineHeight;
+                    }
+                });
+            }
+
+            // Semester credits
+            doc.setFont(undefined, 'italic');
+            doc.text(`  Total: ${semesterCredits} credits`, margin + 5, yPos);
+            yPos += lineHeight + 3;
+        });
+
+        // Check if we need a new page for summary
+        if (yPos > pageHeight - 30) {
             doc.addPage();
             yPos = 20;
         }
 
-        // Semester header
+        // Summary
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
-        const semesterName = getSemesterName(semesterNum);
-        doc.text(`Semester ${semesterNum} (${semesterName})`, margin, yPos);
-
+        doc.text('Summary', margin, yPos);
         yPos += lineHeight;
 
-        // Courses in this semester
         doc.setFontSize(10);
         doc.setFont(undefined, 'normal');
+        doc.text(`Total Credits: ${totalCredits}`, margin + 5, yPos);
+        yPos += lineHeight;
 
-        if (semesterCourses.length === 0) {
-            doc.text('  No courses scheduled', margin + 5, yPos);
+        // Check for selected electives
+        const allCourses = getAllCompletedCourses();
+        const humanitiesElective = allCourses.find(code => courses[code]?.category === 'humanities');
+        const itElective = allCourses.find(code => courses[code]?.category === 'it_elective');
+
+        if (humanitiesElective) {
+            const humanitiesCourse = courses[humanitiesElective];
+            const humanitiesText = humanitiesCourse
+                ? `Humanities Elective: ${humanitiesElective} - ${humanitiesCourse.title}`
+                : `Humanities Elective: ${humanitiesElective}`;
+            doc.text(humanitiesText, margin + 5, yPos);
             yPos += lineHeight;
-        } else {
-            semesterCourses.forEach((courseCode) => {
-                const course = courses[courseCode];
-                if (course) {
-                    const categoryBadge = course.category === 'humanities' ? '[H]' :
-                        course.category === 'it_elective' ? '[IT]' : '';
-                    const courseText = `${courseCode} - ${course.title} (${course.credits} credits) ${categoryBadge}`;
-                    doc.text(courseText, margin + 5, yPos);
-                    yPos += lineHeight;
-                }
-            });
+        }
+        if (itElective) {
+            const itCourse = courses[itElective];
+            const itText = itCourse
+                ? `IT Elective: ${itElective} - ${itCourse.title}`
+                : `IT Elective: ${itElective}`;
+            doc.text(itText, margin + 5, yPos);
+            yPos += lineHeight;
         }
 
-        // Semester credits
-        doc.setFont(undefined, 'italic');
-        doc.text(`  Total: ${semesterCredits} credits`, margin + 5, yPos);
-        yPos += lineHeight + 3;
-    });
-
-    // Check if we need a new page for summary
-    if (yPos > pageHeight - 30) {
-        doc.addPage();
-        yPos = 20;
+        // Save the PDF
+        const fileName = `TCC_CyberSecurity_Plan_${new Date().toISOString().split('T')[0]}.pdf`;
+        doc.save(fileName);
+        return true;
+    } catch (e) {
+        console.error('Error generating PDF:', e);
+        return false;
     }
-
-    // Summary
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'bold');
-    doc.text('Summary', margin, yPos);
-    yPos += lineHeight;
-
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Total Credits: ${totalCredits}`, margin + 5, yPos);
-    yPos += lineHeight;
-
-    // Check for selected electives
-    const allCourses = getAllCompletedCourses();
-    const humanitiesElective = allCourses.find(code => courses[code]?.category === 'humanities');
-    const itElective = allCourses.find(code => courses[code]?.category === 'it_elective');
-
-    if (humanitiesElective) {
-        doc.text(`Humanities Elective: ${humanitiesElective}`, margin + 5, yPos);
-        yPos += lineHeight;
-    }
-    if (itElective) {
-        doc.text(`IT Elective: ${itElective}`, margin + 5, yPos);
-        yPos += lineHeight;
-    }
-
-    // Save the PDF
-    const fileName = `TCC_CyberSecurity_Plan_${new Date().toISOString().split('T')[0]}.pdf`;
-    doc.save(fileName);
 }
 
 function isValidPlanStructure(plan) {
@@ -1915,14 +2182,14 @@ function loadFromStorage(showAlert = true) {
             } catch (e) {
                 throw new Error('Invalid saved plan data format.');
             }
-            
+
             // Validate plan structure
             if (!isValidPlanStructure(parsedPlan)) {
                 throw new Error('Saved plan has invalid structure. Resetting to default.');
             }
-            
+
             studentPlan = parsedPlan;
-            
+
             if (savedPositions) {
                 try {
                     const parsedPositions = JSON.parse(savedPositions);
@@ -1933,7 +2200,7 @@ function loadFromStorage(showAlert = true) {
                     console.warn('Invalid placeholder positions, using defaults');
                 }
             }
-            
+
             const savedMathCourse = localStorage.getItem('cyberplan_currentMathCourse');
             if (savedMathCourse && isValidCourseCode(savedMathCourse)) {
                 currentMathCourse = savedMathCourse;
@@ -1999,15 +2266,92 @@ function clearAll() {
         }
 
         updateUI();
+
+        // Ensure courses are rendered (updateUI calls renderCourses, but this ensures it happens)
+        setTimeout(() => {
+            renderCourses();
+        }, 0);
     }
 }
 
 // Make removeCourseFromSemester available globally for onclick handlers
 window.removeCourseFromSemester = removeCourseFromSemester;
 
-// Math upgrade functionality
-// Track which math course is currently shown in Available Courses (defaults to MTH 161)
-let currentMathCourse = 'MTH 161';
+// Update PDF button state based on plan completion
+function updatePDFButtonState() {
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) {
+        const planComplete = isPlanComplete();
+        saveBtn.disabled = !planComplete;
+        if (planComplete) {
+            saveBtn.classList.remove('btn-disabled');
+            saveBtn.title = 'Create PDF of your completed plan';
+        } else {
+            saveBtn.classList.add('btn-disabled');
+            saveBtn.title = 'Complete your plan (all required courses and electives) to create PDF';
+        }
+    }
+}
+
+// Theme management
+function getSystemTheme() {
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        return 'light';
+    }
+    return 'dark';
+}
+
+function loadTheme() {
+    const savedTheme = localStorage.getItem('cyberplan_theme') || 'system';
+    setTheme(savedTheme);
+}
+
+function setTheme(theme) {
+    // Handle "system" theme
+    if (theme === 'system') {
+        document.documentElement.removeAttribute('data-theme');
+        // Apply system preference via media query (already handled in CSS)
+        const systemTheme = getSystemTheme();
+        updateThemeSelector('system');
+        // Don't save 'system' to localStorage, let CSS handle it
+        return;
+    }
+
+    // Apply explicit theme
+    document.documentElement.setAttribute('data-theme', theme);
+    updateThemeSelector(theme);
+    localStorage.setItem('cyberplan_theme', theme);
+}
+
+function updateThemeSelector(theme) {
+    const themeSelect = document.getElementById('themeSelect');
+    if (themeSelect) {
+        themeSelect.value = theme;
+    }
+}
+
+// Listen for system theme changes
+function setupSystemThemeListener() {
+    if (window.matchMedia) {
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: light)');
+        // Use addListener for older browsers, addEventListener for modern
+        const handler = (e) => {
+            const currentTheme = localStorage.getItem('cyberplan_theme') || 'system';
+            if (currentTheme === 'system') {
+                // System preference changed, update theme
+                document.documentElement.removeAttribute('data-theme');
+                updateThemeSelector('system');
+            }
+        };
+
+        if (mediaQuery.addEventListener) {
+            mediaQuery.addEventListener('change', handler);
+        } else if (mediaQuery.addListener) {
+            // Fallback for older browsers
+            mediaQuery.addListener(handler);
+        }
+    }
+}
 
 // Calculate semester name (Fall 2025, Spring 2026, etc.)
 function getSemesterName(semesterNum, startYear = 2025, startTerm = 'Fall') {
@@ -2034,6 +2378,56 @@ function getSemesterName(semesterNum, startYear = 2025, startTerm = 'Fall') {
     return `${terms[currentTermIndex]} ${currentYear}`;
 }
 
+// Accessibility helper functions
+function announceToScreenReader(message) {
+    const liveRegion = document.getElementById('live-region');
+    if (liveRegion) {
+        liveRegion.textContent = message;
+        // Clear after announcement
+        setTimeout(() => {
+            liveRegion.textContent = '';
+        }, 1000);
+    }
+}
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.remove('show');
+        modal.setAttribute('aria-hidden', 'true');
+    }
+}
+
+function trapFocusInModal(modal) {
+    const focusableElements = modal.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusableElements.length === 0) return;
+
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+
+    const trapHandler = function (e) {
+        if (e.key === 'Tab') {
+            if (e.shiftKey) {
+                if (document.activeElement === firstElement) {
+                    lastElement.focus();
+                    e.preventDefault();
+                }
+            } else {
+                if (document.activeElement === lastElement) {
+                    firstElement.focus();
+                    e.preventDefault();
+                }
+            }
+        }
+    };
+
+    modal.addEventListener('keydown', trapHandler);
+    // Store handler for cleanup if needed
+    modal.dataset.trapHandler = 'true';
+}
+
 function showMathUpgradeModal(currentCourseCode) {
     const modal = document.getElementById('mathUpgradeModal');
     const optionsDiv = document.getElementById('mathUpgradeOptions');
@@ -2044,32 +2438,34 @@ function showMathUpgradeModal(currentCourseCode) {
         'MTH 263', 'MTH 264', 'MTH 265', 'MTH 266', 'MTH 267', 'MTH 283'
     ].map(code => courses[code]).filter(course => course);
 
-    optionsDiv.innerHTML = '';
+    optionsDiv.textContent = '';
 
     mathCourses.forEach(course => {
         const option = document.createElement('div');
         option.className = 'math-upgrade-option';
-        
+        option.setAttribute('role', 'option');
+        option.setAttribute('aria-label', `${course.code}: ${course.title}, ${course.credits} credits`);
+
         const optionInfo = document.createElement('div');
         optionInfo.className = 'math-option-info';
-        
+
         const codeDiv = document.createElement('div');
         codeDiv.className = 'math-option-code';
         codeDiv.textContent = course.code;
         optionInfo.appendChild(codeDiv);
-        
+
         const titleDiv = document.createElement('div');
         titleDiv.className = 'math-option-title';
         titleDiv.textContent = course.title;
         optionInfo.appendChild(titleDiv);
-        
+
         const creditsDiv = document.createElement('div');
         creditsDiv.className = 'math-option-credits';
         creditsDiv.textContent = `${course.credits} Credits`;
         optionInfo.appendChild(creditsDiv);
-        
+
         option.appendChild(optionInfo);
-        
+
         const selectBtn = document.createElement('button');
         selectBtn.className = 'btn btn-primary';
         selectBtn.textContent = 'Select';
@@ -2077,11 +2473,21 @@ function showMathUpgradeModal(currentCourseCode) {
             upgradeMathCourse(currentCourseCode, course.code);
         });
         option.appendChild(selectBtn);
-        
+
         optionsDiv.appendChild(option);
     });
 
     modal.classList.add('show');
+    modal.setAttribute('aria-hidden', 'false');
+
+    // Focus management
+    const closeBtn = modal.querySelector('.close');
+    if (closeBtn) {
+        closeBtn.focus();
+    }
+
+    // Trap focus in modal
+    trapFocusInModal(modal);
 }
 
 function upgradeMathCourse(oldCourseCode, newCourseCode) {
