@@ -1,3 +1,23 @@
+// Utility function to escape HTML
+function escapeHtml(text) {
+    if (typeof text !== 'string') return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Utility function to validate semester number
+function isValidSemesterNumber(num) {
+    return Number.isInteger(num) && num >= 1 && num <= 100;
+}
+
+// Utility function to validate course code
+function isValidCourseCode(code) {
+    return typeof code === 'string' && 
+           /^[A-Z]{2,4} \d{3}$/.test(code) &&
+           courses.hasOwnProperty(code);
+}
+
 // Course data with prerequisites
 const courses = {
     'ENG 111': {
@@ -773,7 +793,11 @@ function renderCourses() {
 
     // If plan is complete, hide all courses
     if (isPlanComplete()) {
-        coursesGrid.innerHTML = '<div class="plan-complete-message">🎉 Your plan is complete! All required courses and electives have been selected.</div>';
+        const completeMsg = document.createElement('div');
+        completeMsg.className = 'plan-complete-message';
+        completeMsg.textContent = '🎉 Your plan is complete! All required courses and electives have been selected.';
+        coursesGrid.innerHTML = '';
+        coursesGrid.appendChild(completeMsg);
         return;
     }
 
@@ -901,18 +925,39 @@ function createCourseCard(course) {
         prerequisitesHTML = '<div class="prerequisites"><strong>Prerequisites:</strong> None</div>';
     }
 
+    // Build card content safely
+    card.appendChild(categoryBadge ? document.createRange().createContextualFragment(categoryBadge) : document.createDocumentFragment());
+    
+    const codeDiv = document.createElement('div');
+    codeDiv.className = 'course-code';
+    codeDiv.textContent = course.code;
+    card.appendChild(codeDiv);
+    
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'course-title';
+    titleDiv.textContent = course.title;
+    card.appendChild(titleDiv);
+    
+    const creditsDiv = document.createElement('div');
+    creditsDiv.className = 'course-credits';
+    creditsDiv.textContent = `${course.credits} Credits`;
+    card.appendChild(creditsDiv);
+    
+    card.appendChild(document.createRange().createContextualFragment(prerequisitesHTML));
+    
     // Add upgrade button for the current math course being shown in Available Courses
-    const upgradeButton = course.code.startsWith('MTH ') && course.code === currentMathCourse ?
-        '<button class="upgrade-btn" onclick="event.stopPropagation(); event.preventDefault(); showMathUpgradeModal(\'' + course.code + '\'); return false;">Or Higher (click to change)</button>' : '';
-
-    card.innerHTML = `
-        ${categoryBadge}
-        <div class="course-code">${course.code}</div>
-        <div class="course-title">${course.title}</div>
-        <div class="course-credits">${course.credits} Credits</div>
-        ${prerequisitesHTML}
-        ${upgradeButton}
-    `;
+    if (course.code.startsWith('MTH ') && course.code === currentMathCourse) {
+        const upgradeBtn = document.createElement('button');
+        upgradeBtn.className = 'upgrade-btn';
+        upgradeBtn.textContent = 'Or Higher (click to change)';
+        upgradeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            showMathUpgradeModal(course.code);
+            return false;
+        });
+        card.appendChild(upgradeBtn);
+    }
 
     // Make draggable if not locked (math courses are never locked)
     if (!isLocked || course.code.startsWith('MTH ')) {
@@ -941,9 +986,14 @@ function showSemesterSelector(course) {
     const semesters = Object.keys(studentPlan).map(Number).sort((a, b) => a - b);
     const semesterList = semesters.join(', ');
     const semester = prompt(`Select semester (${semesterList}) to add ${course.code}:\n\nOr enter a new semester number to create it:`);
-    const semesterNum = parseInt(semester);
+    
+    if (!semester || semester.trim() === '') {
+        return;
+    }
+    
+    const semesterNum = parseInt(semester.trim(), 10);
 
-    if (semesterNum >= 1) {
+    if (isValidSemesterNumber(semesterNum)) {
         // Create semester if it doesn't exist
         if (!studentPlan[semesterNum]) {
             studentPlan[semesterNum] = [];
@@ -954,29 +1004,54 @@ function showSemesterSelector(course) {
                 const semesterDiv = document.createElement('div');
                 semesterDiv.className = 'semester';
                 semesterDiv.dataset.semester = semesterNum;
-                semesterDiv.innerHTML = `
-                    <div class="semester-header">
-                        <h3>Semester ${semesterNum} <span class="semester-date">(${getSemesterName(semesterNum)})</span></h3>
-                        <span class="credits">Credits: <span class="semester-credits">0</span></span>
-                        <button class="remove-semester-btn" onclick="removeSemester(${semesterNum})" title="Remove semester">×</button>
-                    </div>
-                    <div class="courses-list" data-semester="${semesterNum}"></div>
-                `;
+                
+                const headerDiv = document.createElement('div');
+                headerDiv.className = 'semester-header';
+                
+                const h3 = document.createElement('h3');
+                h3.textContent = `Semester ${semesterNum} `;
+                const dateSpan = document.createElement('span');
+                dateSpan.className = 'semester-date';
+                dateSpan.textContent = `(${getSemesterName(semesterNum)})`;
+                h3.appendChild(dateSpan);
+                headerDiv.appendChild(h3);
+                
+                const creditsSpan = document.createElement('span');
+                creditsSpan.className = 'credits';
+                creditsSpan.innerHTML = 'Credits: <span class="semester-credits">0</span>';
+                headerDiv.appendChild(creditsSpan);
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'remove-semester-btn';
+                removeBtn.textContent = '×';
+                removeBtn.title = 'Remove semester';
+                removeBtn.addEventListener('click', () => removeSemester(semesterNum));
+                headerDiv.appendChild(removeBtn);
+                
+                semesterDiv.appendChild(headerDiv);
+                
+                const coursesList = document.createElement('div');
+                coursesList.className = 'courses-list';
+                coursesList.dataset.semester = semesterNum;
+                semesterDiv.appendChild(coursesList);
+                
                 semestersContainer.insertBefore(semesterDiv, addSemesterContainer);
 
                 // Setup drag and drop
-                const coursesList = semesterDiv.querySelector(`.courses-list[data-semester="${semesterNum}"]`);
-                const semesterContainer = semesterDiv;
+                const newCoursesList = semesterDiv.querySelector(`.courses-list[data-semester="${semesterNum}"]`);
+                const newSemesterContainer = semesterDiv;
 
-                coursesList.addEventListener('dragover', handleDragOver);
-                coursesList.addEventListener('drop', (e) => handleDrop(e, semesterNum));
-                coursesList.addEventListener('dragenter', handleDragEnter);
-                coursesList.addEventListener('dragleave', handleDragLeave);
+                if (newCoursesList) {
+                    newCoursesList.addEventListener('dragover', handleDragOver);
+                    newCoursesList.addEventListener('drop', (e) => handleDrop(e, semesterNum));
+                    newCoursesList.addEventListener('dragenter', handleDragEnter);
+                    newCoursesList.addEventListener('dragleave', handleDragLeave);
+                }
 
-                semesterContainer.addEventListener('dragover', handleDragOver);
-                semesterContainer.addEventListener('drop', (e) => handleDrop(e, semesterNum));
-                semesterContainer.addEventListener('dragenter', handleDragEnter);
-                semesterContainer.addEventListener('dragleave', handleDragLeave);
+                newSemesterContainer.addEventListener('dragover', handleDragOver);
+                newSemesterContainer.addEventListener('drop', (e) => handleDrop(e, semesterNum));
+                newSemesterContainer.addEventListener('dragenter', handleDragEnter);
+                newSemesterContainer.addEventListener('dragleave', handleDragLeave);
             }
         }
         addCourseToSemester(course.code, semesterNum);
@@ -1362,33 +1437,55 @@ function addNewSemester() {
         const semesterDiv = document.createElement('div');
         semesterDiv.className = 'semester';
         semesterDiv.dataset.semester = nextSemester;
-        semesterDiv.innerHTML = `
-            <div class="semester-header">
-                <h3>Semester ${nextSemester} <span class="semester-date">(${getSemesterName(nextSemester)})</span></h3>
-                <span class="credits">Credits: <span class="semester-credits">0</span></span>
-                <button class="remove-semester-btn" onclick="removeSemester(${nextSemester})" title="Remove semester">×</button>
-            </div>
-            <div class="courses-list" data-semester="${nextSemester}"></div>
-        `;
+        
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'semester-header';
+        
+        const h3 = document.createElement('h3');
+        h3.textContent = `Semester ${nextSemester} `;
+        const dateSpan = document.createElement('span');
+        dateSpan.className = 'semester-date';
+        dateSpan.textContent = `(${getSemesterName(nextSemester)})`;
+        h3.appendChild(dateSpan);
+        headerDiv.appendChild(h3);
+        
+        const creditsSpan = document.createElement('span');
+        creditsSpan.className = 'credits';
+        creditsSpan.innerHTML = 'Credits: <span class="semester-credits">0</span>';
+        headerDiv.appendChild(creditsSpan);
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-semester-btn';
+        removeBtn.textContent = '×';
+        removeBtn.title = 'Remove semester';
+        removeBtn.addEventListener('click', () => removeSemester(nextSemester));
+        headerDiv.appendChild(removeBtn);
+        
+        semesterDiv.appendChild(headerDiv);
+        
+        const coursesList = document.createElement('div');
+        coursesList.className = 'courses-list';
+        coursesList.dataset.semester = nextSemester;
+        semesterDiv.appendChild(coursesList);
 
         // Append to semesters container
         semestersContainer.appendChild(semesterDiv);
 
         // Setup drag and drop for new semester
-        const coursesList = semesterDiv.querySelector(`.courses-list[data-semester="${nextSemester}"]`);
-        const semesterContainer = semesterDiv;
+        const newSemesterCoursesList = semesterDiv.querySelector(`.courses-list[data-semester="${nextSemester}"]`);
+        const newSemesterContainer = semesterDiv;
 
-        if (coursesList) {
-            coursesList.addEventListener('dragover', handleDragOver);
-            coursesList.addEventListener('drop', (e) => handleDrop(e, nextSemester));
-            coursesList.addEventListener('dragenter', handleDragEnter);
-            coursesList.addEventListener('dragleave', handleDragLeave);
+        if (newSemesterCoursesList) {
+            newSemesterCoursesList.addEventListener('dragover', handleDragOver);
+            newSemesterCoursesList.addEventListener('drop', (e) => handleDrop(e, nextSemester));
+            newSemesterCoursesList.addEventListener('dragenter', handleDragEnter);
+            newSemesterCoursesList.addEventListener('dragleave', handleDragLeave);
         }
 
-        semesterContainer.addEventListener('dragover', handleDragOver);
-        semesterContainer.addEventListener('drop', (e) => handleDrop(e, nextSemester));
-        semesterContainer.addEventListener('dragenter', handleDragEnter);
-        semesterContainer.addEventListener('dragleave', handleDragLeave);
+        newSemesterContainer.addEventListener('dragover', handleDragOver);
+        newSemesterContainer.addEventListener('drop', (e) => handleDrop(e, nextSemester));
+        newSemesterContainer.addEventListener('dragenter', handleDragEnter);
+        newSemesterContainer.addEventListener('dragleave', handleDragLeave);
 
         updateUI();
     } catch (error) {
@@ -1478,8 +1575,16 @@ function showElectiveSelector(category, semester) {
     );
 
     if (selection) {
+        const trimmedSelection = selection.trim().toUpperCase();
+        
+        // Validate course code format
+        if (!/^[A-Z]{2,4} \d{3}$/.test(trimmedSelection)) {
+            alert('Invalid course code format. Please enter a code like "ART 100".');
+            return;
+        }
+        
         const selectedCourse = availableElectives.find(course =>
-            course.code.toUpperCase() === selection.trim().toUpperCase()
+            course.code.toUpperCase() === trimmedSelection
         );
 
         if (selectedCourse) {
@@ -1578,7 +1683,11 @@ function updateSemesterDisplay(semester) {
 
     // Show empty message only if semester is completely empty and has no placeholders
     if (coursesList.children.length === 0) {
-        coursesList.innerHTML = '<div class="empty-semester">No courses added yet</div>';
+        const emptyMsg = document.createElement('div');
+        emptyMsg.className = 'empty-semester';
+        emptyMsg.textContent = 'No courses added yet';
+        coursesList.innerHTML = '';
+        coursesList.appendChild(emptyMsg);
     }
 
     creditsSpan.textContent = semesterCredits;
@@ -1669,6 +1778,11 @@ function saveToStorage() {
 }
 
 function generatePDF() {
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+        alert('PDF library not loaded. Please refresh the page and try again.');
+        return;
+    }
+    
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
@@ -1776,18 +1890,52 @@ function generatePDF() {
     doc.save(fileName);
 }
 
+function isValidPlanStructure(plan) {
+    if (!plan || typeof plan !== 'object') return false;
+    // Check that all values are arrays
+    for (const key in plan) {
+        if (!Array.isArray(plan[key])) return false;
+        // Validate course codes in arrays
+        for (const courseCode of plan[key]) {
+            if (!isValidCourseCode(courseCode)) return false;
+        }
+    }
+    return true;
+}
+
 function loadFromStorage(showAlert = true) {
     try {
         const saved = localStorage.getItem('cyberplan_studentPlan');
         const savedPositions = localStorage.getItem('cyberplan_placeholderPositions');
 
         if (saved) {
-            studentPlan = JSON.parse(saved);
-            if (savedPositions) {
-                placeholderPositions = JSON.parse(savedPositions);
+            let parsedPlan;
+            try {
+                parsedPlan = JSON.parse(saved);
+            } catch (e) {
+                throw new Error('Invalid saved plan data format.');
             }
+            
+            // Validate plan structure
+            if (!isValidPlanStructure(parsedPlan)) {
+                throw new Error('Saved plan has invalid structure. Resetting to default.');
+            }
+            
+            studentPlan = parsedPlan;
+            
+            if (savedPositions) {
+                try {
+                    const parsedPositions = JSON.parse(savedPositions);
+                    if (parsedPositions && typeof parsedPositions === 'object') {
+                        placeholderPositions = parsedPositions;
+                    }
+                } catch (e) {
+                    console.warn('Invalid placeholder positions, using defaults');
+                }
+            }
+            
             const savedMathCourse = localStorage.getItem('cyberplan_currentMathCourse');
-            if (savedMathCourse) {
+            if (savedMathCourse && isValidCourseCode(savedMathCourse)) {
                 currentMathCourse = savedMathCourse;
             }
             updateUI();
@@ -1901,15 +2049,35 @@ function showMathUpgradeModal(currentCourseCode) {
     mathCourses.forEach(course => {
         const option = document.createElement('div');
         option.className = 'math-upgrade-option';
-        option.innerHTML = `
-            <div class="math-option-info">
-                <div class="math-option-code">${course.code}</div>
-                <div class="math-option-title">${course.title}</div>
-                <div class="math-option-credits">${course.credits} Credits</div>
-                ${'' /* No prerequisite display for math courses */}
-            </div>
-            <button class="btn btn-primary" onclick="upgradeMathCourse('${currentCourseCode}', '${course.code}')">Select</button>
-        `;
+        
+        const optionInfo = document.createElement('div');
+        optionInfo.className = 'math-option-info';
+        
+        const codeDiv = document.createElement('div');
+        codeDiv.className = 'math-option-code';
+        codeDiv.textContent = course.code;
+        optionInfo.appendChild(codeDiv);
+        
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'math-option-title';
+        titleDiv.textContent = course.title;
+        optionInfo.appendChild(titleDiv);
+        
+        const creditsDiv = document.createElement('div');
+        creditsDiv.className = 'math-option-credits';
+        creditsDiv.textContent = `${course.credits} Credits`;
+        optionInfo.appendChild(creditsDiv);
+        
+        option.appendChild(optionInfo);
+        
+        const selectBtn = document.createElement('button');
+        selectBtn.className = 'btn btn-primary';
+        selectBtn.textContent = 'Select';
+        selectBtn.addEventListener('click', () => {
+            upgradeMathCourse(currentCourseCode, course.code);
+        });
+        option.appendChild(selectBtn);
+        
         optionsDiv.appendChild(option);
     });
 
