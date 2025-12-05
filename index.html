@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TCC Cyber Security Course Planner</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Tidewater Community College</h1>
+            <h2>Associate of Applied Science: Cyber Security (345)</h2>
+            <p class="subtitle">Plan your courses and track prerequisites</p>
+        </header>
+
+        <div class="controls">
+            <button id="saveBtn" class="btn btn-primary">Save Plan</button>
+            <button id="loadBtn" class="btn btn-secondary">Load Plan</button>
+            <button id="resetBtn" class="btn btn-secondary">Reset to Default</button>
+            <button id="clearBtn" class="btn btn-danger">Clear All</button>
+            <div class="credits-display">
+                <strong>Total Credits: <span id="totalCredits">0</span></strong>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="left-column">
+                <div class="semesters-container" id="semestersContainer">
+                    <div class="semester" data-semester="1">
+                        <div class="semester-header">
+                            <h3>Semester 1 <span class="semester-date">(Fall 2025)</span></h3>
+                            <span class="credits">Credits: <span class="semester-credits">0</span></span>
+                        </div>
+                        <div class="courses-list" data-semester="1"></div>
+                    </div>
+
+                    <div class="semester" data-semester="2">
+                        <div class="semester-header">
+                            <h3>Semester 2 <span class="semester-date">(Spring 2026)</span></h3>
+                            <span class="credits">Credits: <span class="semester-credits">0</span></span>
+                        </div>
+                        <div class="courses-list" data-semester="2"></div>
+                    </div>
+
+                    <div class="semester" data-semester="3">
+                        <div class="semester-header">
+                            <h3>Semester 3 <span class="semester-date">(Summer 2026)</span></h3>
+                            <span class="credits">Credits: <span class="semester-credits">0</span></span>
+                        </div>
+                        <div class="courses-list" data-semester="3"></div>
+                    </div>
+
+                    <div class="semester" data-semester="4">
+                        <div class="semester-header">
+                            <h3>Semester 4 <span class="semester-date">(Fall 2026)</span></h3>
+                            <span class="credits">Credits: <span class="semester-credits">0</span></span>
+                        </div>
+                        <div class="courses-list" data-semester="4"></div>
+                    </div>
+                </div>
+                <div class="add-semester-container">
+                    <button id="addSemesterBtn" class="btn btn-secondary">+ Add Semester</button>
+                </div>
+            </div>
+
+            <div class="courses-panel">
+                <h3>Available Courses</h3>
+                <div class="search-box">
+                    <input type="text" id="courseSearch" placeholder="Search courses...">
+                </div>
+                <div class="courses-grid" id="coursesGrid"></div>
+            </div>
+        </div>
+
+        <div id="prerequisiteModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h3>Prerequisites Required</h3>
+                <p id="prerequisiteMessage"></p>
+                <div id="missingPrerequisites"></div>
+            </div>
+        </div>
+
+        <div id="mathUpgradeModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h3>Upgrade Math Course</h3>
+                <p>Select a higher level math course to replace MTH 161:</p>
+                <div id="mathUpgradeOptions"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
