@@ -611,6 +611,12 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function setupEventListeners() {
+    // Instructions button
+    const instructionsBtn = document.getElementById('instructionsBtn');
+    if (instructionsBtn) {
+        instructionsBtn.addEventListener('click', showInstructionsModal);
+    }
+
     // Save/Clear buttons
     const saveBtn = document.getElementById('saveBtn');
     const resetBtn = document.getElementById('resetBtn');
@@ -659,15 +665,26 @@ function setupEventListeners() {
         });
     }
 
+    // Close button for instructions modal
+    const instructionsCloseBtn = document.querySelector('#instructionsModal .close');
+    if (instructionsCloseBtn) {
+        instructionsCloseBtn.addEventListener('click', () => {
+            closeModal('instructionsModal');
+        });
+    }
+
     // Close modal on Escape key
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             const prerequisiteModal = document.getElementById('prerequisiteModal');
             const mathUpgradeModal = document.getElementById('mathUpgradeModal');
+            const instructionsModal = document.getElementById('instructionsModal');
             if (prerequisiteModal.classList.contains('show')) {
                 closeModal('prerequisiteModal');
             } else if (mathUpgradeModal.classList.contains('show')) {
                 closeModal('mathUpgradeModal');
+            } else if (instructionsModal.classList.contains('show')) {
+                closeModal('instructionsModal');
             }
         }
     });
@@ -682,6 +699,11 @@ function setupEventListeners() {
         const mathUpgradeModal = document.getElementById('mathUpgradeModal');
         if (e.target === mathUpgradeModal) {
             closeModal('mathUpgradeModal');
+        }
+
+        const instructionsModal = document.getElementById('instructionsModal');
+        if (e.target === instructionsModal) {
+            closeModal('instructionsModal');
         }
     });
 
@@ -898,9 +920,19 @@ function handleDrop(e, targetSemester) {
 
 function hasElectiveSelected(category) {
     // Check all semesters dynamically
-    return Object.keys(studentPlan).some(semester => {
+    const hasInSemester = Object.keys(studentPlan).some(semester => {
         return hasElectiveInSemester(parseInt(semester), category);
     });
+    
+    // Also check if a completed course of this category exists
+    if (!hasInSemester) {
+        return Array.from(completedCourses).some(courseCode => {
+            const course = courses[courseCode];
+            return course && course.category === category;
+        });
+    }
+    
+    return hasInSemester;
 }
 
 function renderCourses() {
@@ -1121,6 +1153,10 @@ function createCourseCard(course) {
     // Add completed/transfer checkbox
     const checkboxContainer = document.createElement('div');
     checkboxContainer.className = 'completed-checkbox-container';
+    // Prevent clicks on checkbox container from triggering course card click
+    checkboxContainer.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
     
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
@@ -1132,11 +1168,17 @@ function createCourseCard(course) {
         e.stopPropagation();
         toggleCourseCompleted(course.code);
     });
+    checkbox.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
     
     const checkboxLabel = document.createElement('label');
     checkboxLabel.htmlFor = `completed-${course.code}`;
     checkboxLabel.className = 'completed-checkbox-label';
     checkboxLabel.textContent = isCompleted ? '✓ Completed' : 'Completed';
+    checkboxLabel.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
     
     checkboxContainer.appendChild(checkbox);
     checkboxContainer.appendChild(checkboxLabel);
@@ -1165,6 +1207,12 @@ function createCourseCard(course) {
         card.addEventListener('click', (e) => {
             // Don't trigger if clicking the upgrade button
             if (e.target.classList.contains('upgrade-btn') || e.target.closest('.upgrade-btn')) {
+                return;
+            }
+            // Don't trigger if clicking the checkbox or checkbox container
+            if (e.target.classList.contains('completed-checkbox') || 
+                e.target.classList.contains('completed-checkbox-label') ||
+                e.target.closest('.completed-checkbox-container')) {
                 return;
             }
             // Only trigger click handler if not dragging
@@ -2536,7 +2584,7 @@ function resetToDefault() {
 }
 
 function clearAll() {
-    if (confirm('Are you sure you want to clear all courses? This cannot be undone. Completed/transfer course markings will be preserved.')) {
+    if (confirm('Are you sure you want to clear all courses? This cannot be undone. This will also clear all completed/transfer course markings.')) {
         studentPlan = {
             1: ['SDV 101'], // Default SDV 101 in Semester 1
             2: [],
@@ -2548,7 +2596,8 @@ function clearAll() {
             it_elective: 4
         };
         currentMathCourse = 'MTH 161'; // Reset to default math course
-        // Note: completedCourses is preserved
+        // Clear completed courses as well
+        completedCourses.clear();
         saveToStorage();
 
         // Remove any extra semesters (5+) from the DOM
@@ -2872,7 +2921,144 @@ function upgradeMathCourse(oldCourseCode, newCourseCode) {
     updateUI();
 }
 
+// Show instructions modal
+function showInstructionsModal() {
+    const modal = document.getElementById('instructionsModal');
+    const content = document.getElementById('instructionsContent');
+    
+    if (!modal || !content) return;
+    
+    // Set the instructions content
+    content.innerHTML = `
+        <h1 id="instructionsModal-title">CyberPlan Instructions</h1>
+        
+        <p>Welcome to <strong>CyberPlan</strong>, a simple tool to help you build your academic plan for the Cybersecurity program. Follow the steps below to create your semester-by-semester schedule and export it as a PDF for review.</p>
+        
+        <p>Website: <a href="https://jkirchtcc.github.io/cyberplan/" target="_blank" rel="noopener noreferrer">https://jkirchtcc.github.io/cyberplan/</a></p>
+        
+        <h2>1. Getting Started</h2>
+        <p>For the best experience, use a <strong>laptop or desktop computer</strong>.</p>
+        <p>The drag-and-drop features do not work well on smartphones.</p>
+        <p>Nothing is saved online. Your plan exists only in your browser until you download it.</p>
+        
+        <h2>2. Choose How You Want to Start</h2>
+        <p>CyberPlan gives you two ways to begin your plan:</p>
+        
+        <h3>Option A: Reset to Default (Recommended for Most Students)</h3>
+        <p>This loads a pre-built plan based on the standard TCC Cybersecurity curriculum.</p>
+        <p>All required courses are already placed for you.</p>
+        <p>After loading the default plan, you only need to:</p>
+        <ul>
+            <li>Drag your <strong>Humanities Elective</strong> into <strong>Semester 1</strong></li>
+            <li>Drag your <strong>IT Elective</strong> into <strong>Semester 4</strong></li>
+        </ul>
+        <p>This option is the fastest way to complete the assignment.</p>
+        
+        <h3>Option B: Clear All (Custom Plan)</h3>
+        <p>This removes everything except one required course: <strong>SDV 101 stays in Semester 1</strong> by default because it usually is taken during your first semester, but you can move it if needed.</p>
+        <p>Choose this option if:</p>
+        <ul>
+            <li>You already transferred credits</li>
+            <li>You want to customize every semester</li>
+            <li>You want to build the plan completely from scratch</li>
+        </ul>
+        <p>You can place any transferred courses into Semester 1, Semester 2, or whichever term makes sense for you. Each course has a <strong>Completed</strong> checkbox so you can mark transfer credit or prior completion.</p>
+        
+        <h2>3. Building Your Plan</h2>
+        
+        <h3>Drag and Drop Courses</h3>
+        <p>You can drag any course or elective placeholder from the right panel into any semester box on the left.</p>
+        <p>You can rearrange courses at any time by dragging them again, or even move them between semesters. The system will help prevent prerequisite issues by warning you if you try to place a course before its prerequisites are completed.</p>
+        
+        <h3>Credit Limits</h3>
+        <p>Each semester is limited to <strong>18 credits</strong>.</p>
+        <p>If adding a course would push a semester above 18 credits, the planner will prevent it from dropping into that semester.</p>
+        <p>This keeps you within a realistic course load.</p>
+        
+        <h3>Adding More Semesters</h3>
+        <p>If you need additional terms (for example, summer courses or a lighter workload):</p>
+        <ul>
+            <li>Click <strong>Add Semester</strong> at the bottom of the page</li>
+            <li>A new semester will appear and can be filled like the others</li>
+        </ul>
+        
+        <h3>Marking Completed Courses</h3>
+        <p>If you already completed a course (through transfer credit or prior enrollment):</p>
+        <ul>
+            <li>Check the <strong>Completed</strong> box on the course</li>
+            <li>The course will move to the <strong>Completed/Transfer Courses</strong> section at the top</li>
+            <li>A checkmark will appear showing the requirement is already finished</li>
+        </ul>
+        <p>This helps your advisor understand which classes you still need.</p>
+        
+        <h2>4. Reviewing Your Plan</h2>
+        <p>Before exporting your plan, make sure:</p>
+        <ul>
+            <li>All required courses appear in your schedule</li>
+            <li>Electives are placed in the correct semesters</li>
+            <li>No semester exceeds 18 credits</li>
+            <li>Completed courses are marked correctly</li>
+            <li>The plan matches your timeline and goals</li>
+        </ul>
+        <p>You may adjust any course by dragging it to a new location.</p>
+        
+        <h2>5. PDF of Your Plan</h2>
+        <p>When everything looks correct:</p>
+        <ol>
+            <li>Click <strong>Create PDF</strong></li>
+            <li>Your browser will generate a PDF of your plan</li>
+            <li>Save the PDF to your computer</li>
+            <li>Email it to your instructor for review</li>
+        </ol>
+        <p>A simple email might say:</p>
+        <blockquote>
+            <p>Attached is my academic plan created with CyberPlan for my SDV 101 TCC Academic Plan Assignment.</p>
+            <p>I have included my Advisement Transcript Report (ATR) located in the Student Information System (SIS) in the myTCC web portal.</p>
+            <p>I have included the CyberPlan PDF as part of my Academic Plan Worksheet, and have answered the questions below:</p>
+            
+            <h4>Academic Planning:</h4>
+            <p>Are you required to take any developmental courses? If yes, what are they? (For example, pre-college Math or English. SDV is not a development course, contrary to its name).</p>
+            <p>If you are about to graduate and this is your last semester at TCC, indicate that here. (Remember that you should still fill in the worksheet on the previous page for this semester including the degree/program title).</p>
+            
+            <h4>Transfer Planning:</h4>
+            <p>Do you plan to transfer? If yes, complete the following questions:</p>
+            <ul>
+                <li>Which college or university do you plan to attend?</li>
+                <li>To what program of study do you plan to transfer?</li>
+                <li>If you have selected a specific program, identify the transfer agreement set in place with that institution: TCC provides a gateway to ODU with a guaranteed admission agreement.</li>
+            </ul>
+            <p>For more information about transferring, visit the VCCS Transfer Guides located at the following website: <a href="http://www.tcc.edu/academics/degrees/transfer" target="_blank" rel="noopener noreferrer">http://www.tcc.edu/academics/degrees/transfer</a></p>
+            <p>If you do not plan to transfer, what is your plan for post-graduation? Will you go straight into a profession? Explain in the space below:</p>
+        </blockquote>
+        
+        <h2>6. Troubleshooting</h2>
+        <ul>
+            <li><strong>Dragging does not work:</strong> Refresh the page.</li>
+            <li><strong>PDF is blank or missing content:</strong> Scroll through the page once and try again.</li>
+            <li><strong>Course disappears:</strong> It likely dropped into another semester. Scroll to check all terms.</li>
+            <li><strong>Plan looks wrong:</strong> Use <strong>Reset to Default</strong> to start over.</li>
+        </ul>
+        
+        <h2>7. Feedback and Improvements</h2>
+        <p>If you run into any issues or have ideas for improvements, you can submit feedback here:</p>
+        <p><a href="https://github.com/jkirchtcc/cyberplan" target="_blank" rel="noopener noreferrer">https://github.com/jkirchtcc/cyberplan</a></p>
+    `;
+    
+    modal.classList.add('show');
+    modal.setAttribute('aria-hidden', 'false');
+    
+    // Focus management
+    const closeBtn = modal.querySelector('.close');
+    if (closeBtn) {
+        closeBtn.focus();
+    }
+    
+    // Trap focus in modal
+    trapFocusInModal(modal);
+}
+
 // Make functions available globally
 window.showMathUpgradeModal = showMathUpgradeModal;
 window.upgradeMathCourse = upgradeMathCourse;
+window.showInstructionsModal = showInstructionsModal;
 
