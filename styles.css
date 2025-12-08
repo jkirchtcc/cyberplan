@@ -476,6 +476,71 @@ header h2 {
     gap: 20px;
 }
 
+/* Completed courses section */
+.completed-courses-section {
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 6px var(--shadow);
+    margin-bottom: 20px;
+    border: 2px solid var(--success);
+    display: none;
+    /* Hidden by default, shown when there are completed courses */
+}
+
+.completed-courses-header {
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.completed-courses-header h3 {
+    color: var(--success);
+    font-size: 1.3em;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.completed-courses-header h3::before {
+    content: '✓';
+    font-size: 1.2em;
+}
+
+.completed-courses-header .credits {
+    color: var(--text-secondary);
+    font-size: 1em;
+    font-weight: 600;
+}
+
+.completed-courses-header .credits .completed-courses-credits {
+    color: var(--success);
+    font-weight: 700;
+}
+
+.completed-courses-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.completed-course-item {
+    background: rgba(76, 175, 80, 0.1);
+    border-left: 4px solid var(--success);
+}
+
+[data-theme="light"] .completed-courses-section {
+    border: 2px solid var(--success);
+}
+
+[data-theme="light"] .completed-course-item {
+    background: rgba(56, 142, 60, 0.1);
+}
+
 .semesters-container {
     display: flex;
     flex-direction: column;
@@ -793,6 +858,82 @@ header h2 {
 
 .course-card.locked .prerequisites {
     color: var(--text-muted);
+}
+
+/* Completed course styling */
+.course-card.completed-course,
+.course-item.completed-course {
+    border-left: 4px solid var(--success);
+    background: rgba(76, 175, 80, 0.1);
+    position: relative;
+}
+
+.course-card.completed-course::before,
+.course-item.completed-course::before {
+    content: '✓';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    color: var(--success);
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+[data-theme="light"] .course-card.completed-course,
+[data-theme="light"] .course-item.completed-course {
+    border-left: 4px solid var(--success);
+    background: rgba(56, 142, 60, 0.1);
+}
+
+/* Completed checkbox container */
+.completed-checkbox-container {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Semester course item actions container */
+.course-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+/* Checkbox container in semester items - no border/margin */
+.completed-checkbox-container.semester-checkbox {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+}
+
+.completed-checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--success);
+}
+
+.completed-checkbox-label {
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+    flex: 1;
+}
+
+.completed-checkbox:checked+.completed-checkbox-label {
+    color: var(--success);
+    font-weight: 600;
+}
+
+.completed-checkbox:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
 }
 
 /* Category badges */

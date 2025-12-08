@@ -475,6 +475,18 @@ let studentPlan = {
     4: []
 };
 
+// Track courses marked as completed or transfer credit
+let completedCourses = new Set();
+
+// Helper function to safely check if a course is completed
+function isCourseCompleted(courseCode) {
+    if (!(completedCourses instanceof Set)) {
+        completedCourses = new Set();
+        return false;
+    }
+    return completedCourses.has(courseCode);
+}
+
 // Track placeholder positions (which semester has which placeholder)
 let placeholderPositions = {
     humanities: 1,  // Default to Semester 1
@@ -502,12 +514,20 @@ const requiredCourses = {
 function isPlanComplete() {
     // Check if all required courses are present in their designated semesters
     // Note: With dynamic semesters, we check if required courses exist anywhere
+    // Also consider courses marked as completed/transfer credit
     const allCourses = [];
     Object.values(studentPlan).forEach(semesterCourses => {
         allCourses.push(...semesterCourses);
     });
+    
+    // Add completed/transfer courses
+    completedCourses.forEach(courseCode => {
+        if (!allCourses.includes(courseCode)) {
+            allCourses.push(courseCode);
+        }
+    });
 
-    // Check if all required courses exist (regardless of semester)
+    // Check if all required courses exist (regardless of semester or completed status)
     for (let semester = 1; semester <= 4; semester++) {
         const required = requiredCourses[semester];
         const hasAllRequired = required.every(courseCode =>
@@ -550,14 +570,34 @@ document.addEventListener('DOMContentLoaded', () => {
             setupSystemThemeListener();
         }
 
+        // Load completed courses
+        if (typeof loadCompletedCoursesFromStorage === 'function') {
+            loadCompletedCoursesFromStorage();
+        }
+
         // Load saved plan
         if (typeof loadFromStorage === 'function') {
             loadFromStorage(false); // Load silently on first load
+        }
+        
+        // Remove any courses from semesters that are marked as completed
+        // (in case they were marked before this feature was added)
+        // Ensure completedCourses is a Set before using .has()
+        if (completedCourses instanceof Set) {
+            Object.keys(studentPlan).forEach(semester => {
+                const semesterNum = parseInt(semester);
+                studentPlan[semesterNum] = studentPlan[semesterNum].filter(code => !isCourseCompleted(code));
+            });
         }
 
         // Render courses after loading
         if (typeof renderCourses === 'function') {
             renderCourses();
+        }
+        
+        // Update completed courses section
+        if (typeof updateCompletedCoursesSection === 'function') {
+            updateCompletedCoursesSection();
         }
 
         // Update PDF button state on initial load
@@ -884,7 +924,12 @@ function renderCourses() {
 
     const hasHumanities = hasElectiveSelected('humanities');
     const hasITElective = hasElectiveSelected('it_elective');
-    const completedCourses = getAllCompletedCourses();
+    const coursesInSemesters = [];
+    Object.values(studentPlan).forEach(semesterCourses => {
+        semesterCourses.forEach(courseCode => {
+            coursesInSemesters.push(courseCode);
+        });
+    });
 
     // Verify courses object exists
     if (!courses || typeof courses !== 'object') {
@@ -893,8 +938,11 @@ function renderCourses() {
     }
 
     // Show only one math course in Available Courses (the current one, default MTH 161)
+    // Don't show if it's in a semester or marked as completed
     const mathCourseToShow = courses[currentMathCourse];
-    if (mathCourseToShow && !completedCourses.includes(currentMathCourse)) {
+    if (mathCourseToShow && 
+        !coursesInSemesters.includes(currentMathCourse) && 
+        !isCourseCompleted(currentMathCourse)) {
         const courseCard = createCourseCard(mathCourseToShow);
         if (courseCard) {
             coursesGrid.appendChild(courseCard);
@@ -903,8 +951,13 @@ function renderCourses() {
 
     Object.values(courses).forEach(course => {
         // Hide courses that are already in a semester
-        if (completedCourses.includes(course.code)) {
+        if (coursesInSemesters.includes(course.code)) {
             return; // Skip this course - it's already in a semester
+        }
+        
+        // Hide courses that are marked as completed (they're in the completed section)
+        if (isCourseCompleted(course.code)) {
+            return; // Skip this course - it's in the completed section
         }
 
         // Skip math courses - we only show the currentMathCourse above
@@ -980,7 +1033,15 @@ function createCourseCard(course) {
     } else {
         card.setAttribute('aria-disabled', 'false');
     }
-
+    
+    // Check if course is marked as completed/transfer
+    const isCompleted = isCourseCompleted(course.code);
+    
+    // Add completed class if marked as completed/transfer
+    if (isCompleted) {
+        card.classList.add('completed-course');
+    }
+    
     // Add category class for styling
     if (course.category === 'humanities') {
         card.classList.add('humanities-elective');
@@ -1056,6 +1117,30 @@ function createCourseCard(course) {
     card.appendChild(creditsDiv);
 
     card.appendChild(document.createRange().createContextualFragment(prerequisitesHTML));
+
+    // Add completed/transfer checkbox
+    const checkboxContainer = document.createElement('div');
+    checkboxContainer.className = 'completed-checkbox-container';
+    
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = `completed-${course.code}`;
+    checkbox.className = 'completed-checkbox';
+    checkbox.checked = isCompleted;
+    checkbox.setAttribute('aria-label', `Mark ${course.code} as completed or transfer credit`);
+    checkbox.addEventListener('change', (e) => {
+        e.stopPropagation();
+        toggleCourseCompleted(course.code);
+    });
+    
+    const checkboxLabel = document.createElement('label');
+    checkboxLabel.htmlFor = `completed-${course.code}`;
+    checkboxLabel.className = 'completed-checkbox-label';
+    checkboxLabel.textContent = isCompleted ? '✓ Completed' : 'Completed';
+    
+    checkboxContainer.appendChild(checkbox);
+    checkboxContainer.appendChild(checkboxLabel);
+    card.appendChild(checkboxContainer);
 
     // Add upgrade button for the current math course being shown in Available Courses
     if (course.code.startsWith('MTH ') && course.code === currentMathCourse) {
@@ -1352,10 +1437,17 @@ function getCourseSemester(courseCode) {
 
 function getAllCompletedCourses() {
     const completed = [];
+    // Add courses from semesters
     Object.values(studentPlan).forEach(semesterCourses => {
         semesterCourses.forEach(courseCode => {
             completed.push(courseCode);
         });
+    });
+    // Add courses marked as completed/transfer credit
+    completedCourses.forEach(courseCode => {
+        if (!completed.includes(courseCode)) {
+            completed.push(courseCode);
+        }
     });
     return completed;
 }
@@ -1567,6 +1659,9 @@ function checkAndRemoveInvalidCourses() {
 }
 
 function updateUI() {
+    // Update completed courses section
+    updateCompletedCoursesSection();
+    
     // Update semester displays for all existing semesters
     const semesters = Object.keys(studentPlan).map(Number).sort((a, b) => a - b);
     semesters.forEach(semester => {
@@ -1581,6 +1676,118 @@ function updateUI() {
 
     // Update PDF button state based on plan completion
     updatePDFButtonState();
+}
+
+// Update the completed courses section
+function updateCompletedCoursesSection() {
+    const completedList = document.getElementById('completedCoursesList');
+    const completedSection = document.getElementById('completedCoursesSection');
+    const creditsSpan = document.querySelector('.completed-courses-credits');
+    
+    if (!completedList || !completedSection) return;
+    
+    completedList.textContent = '';
+    
+    // Calculate total credits for completed courses
+    let totalCredits = 0;
+    Array.from(completedCourses).forEach(courseCode => {
+        const course = courses[courseCode];
+        if (course) {
+            totalCredits += course.credits;
+        }
+    });
+    
+    // Update credits display
+    if (creditsSpan) {
+        creditsSpan.textContent = totalCredits;
+    }
+    
+    if (completedCourses.size === 0) {
+        // Hide section if no completed courses
+        completedSection.style.display = 'none';
+        return;
+    }
+    
+    // Show section
+    completedSection.style.display = 'block';
+    
+    // Sort completed courses by code
+    const sortedCompleted = Array.from(completedCourses).sort();
+    
+    sortedCompleted.forEach(courseCode => {
+        const course = courses[courseCode];
+        if (!course) return;
+        
+        const courseItem = document.createElement('div');
+        courseItem.className = 'course-item completed-course-item';
+        courseItem.dataset.courseCode = course.code;
+        courseItem.setAttribute('role', 'listitem');
+        
+        const courseInfo = document.createElement('div');
+        courseInfo.className = 'course-info';
+        
+        const headerRow = document.createElement('div');
+        headerRow.className = 'course-header-row';
+        
+        const codeDiv = document.createElement('div');
+        codeDiv.className = 'course-code';
+        codeDiv.textContent = course.code;
+        headerRow.appendChild(codeDiv);
+        
+        const categoryBadge = course.category === 'humanities'
+            ? '<span class="category-badge-small humanities-badge">Humanities</span>'
+            : course.category === 'it_elective'
+                ? '<span class="category-badge-small it-badge">IT Elective</span>'
+                : '';
+        
+        if (categoryBadge) {
+            headerRow.appendChild(document.createRange().createContextualFragment(categoryBadge));
+        }
+        
+        courseInfo.appendChild(headerRow);
+        
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'course-title';
+        titleDiv.textContent = course.title;
+        courseInfo.appendChild(titleDiv);
+        
+        const creditsDiv = document.createElement('div');
+        creditsDiv.className = 'course-credits';
+        creditsDiv.textContent = `${course.credits} Credits`;
+        courseInfo.appendChild(creditsDiv);
+        
+        courseItem.appendChild(courseInfo);
+        
+        // Add checkbox to unmark as completed
+        const actionsContainer = document.createElement('div');
+        actionsContainer.className = 'course-item-actions';
+        
+        const checkboxContainer = document.createElement('div');
+        checkboxContainer.className = 'completed-checkbox-container semester-checkbox';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `completed-list-${course.code}`;
+        checkbox.className = 'completed-checkbox';
+        checkbox.checked = true;
+        checkbox.setAttribute('aria-label', `Unmark ${course.code} as completed or transfer credit`);
+        checkbox.addEventListener('change', (e) => {
+            e.stopPropagation();
+            toggleCourseCompleted(course.code);
+        });
+        
+        const checkboxLabel = document.createElement('label');
+        checkboxLabel.htmlFor = `completed-list-${course.code}`;
+        checkboxLabel.className = 'completed-checkbox-label';
+        checkboxLabel.textContent = '✓ Completed';
+        
+        checkboxContainer.appendChild(checkbox);
+        checkboxContainer.appendChild(checkboxLabel);
+        actionsContainer.appendChild(checkboxContainer);
+        
+        courseItem.appendChild(actionsContainer);
+        completedList.appendChild(courseItem);
+    });
 }
 
 function addNewSemester() {
@@ -1877,6 +2084,41 @@ function updateSemesterDisplay(semester) {
         courseInfo.appendChild(creditsDiv);
 
         courseItem.appendChild(courseInfo);
+        
+        // Don't show checkbox in semester if course is already completed
+        // (it should have been moved to completed section)
+        const isCompleted = isCourseCompleted(course.code);
+        if (isCompleted) {
+            // This shouldn't happen, but if it does, skip rendering this course
+            return;
+        }
+        
+        // Create a container for checkbox and remove button
+        const actionsContainer = document.createElement('div');
+        actionsContainer.className = 'course-item-actions';
+        
+        const checkboxContainer = document.createElement('div');
+        checkboxContainer.className = 'completed-checkbox-container semester-checkbox';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `completed-sem-${semester}-${course.code}`;
+        checkbox.className = 'completed-checkbox';
+        checkbox.checked = false;
+        checkbox.setAttribute('aria-label', `Mark ${course.code} as completed or transfer credit`);
+        checkbox.addEventListener('change', (e) => {
+            e.stopPropagation();
+            toggleCourseCompleted(course.code);
+        });
+        
+        const checkboxLabel = document.createElement('label');
+        checkboxLabel.htmlFor = `completed-sem-${semester}-${course.code}`;
+        checkboxLabel.className = 'completed-checkbox-label';
+        checkboxLabel.textContent = 'Completed';
+        
+        checkboxContainer.appendChild(checkbox);
+        checkboxContainer.appendChild(checkboxLabel);
+        actionsContainer.appendChild(checkboxContainer);
 
         const removeBtn = document.createElement('button');
         removeBtn.className = 'remove-btn';
@@ -1886,7 +2128,8 @@ function updateSemesterDisplay(semester) {
             e.stopPropagation();
             removeCourseFromSemester(course.code, semester);
         });
-        courseItem.appendChild(removeBtn);
+        actionsContainer.appendChild(removeBtn);
+        courseItem.appendChild(actionsContainer);
 
         // Add drag handlers
         courseItem.addEventListener('dragstart', handleDragStart);
@@ -1964,7 +2207,12 @@ function filterCourses(searchTerm) {
 
     const hasHumanities = hasElectiveSelected('humanities');
     const hasITElective = hasElectiveSelected('it_elective');
-    const completedCourses = getAllCompletedCourses();
+    const coursesInSemesters = [];
+    Object.values(studentPlan).forEach(semesterCourses => {
+        semesterCourses.forEach(courseCode => {
+            coursesInSemesters.push(courseCode);
+        });
+    });
 
     courseCards.forEach(card => {
         const courseCode = card.dataset.courseCode;
@@ -1972,7 +2220,13 @@ function filterCourses(searchTerm) {
         if (!course) return;
 
         // Hide courses that are already in a semester
-        if (completedCourses.includes(courseCode)) {
+        if (coursesInSemesters.includes(courseCode)) {
+            card.style.display = 'none';
+            return;
+        }
+        
+        // Hide courses that are marked as completed (they're in the completed section)
+        if (isCourseCompleted(courseCode)) {
             card.style.display = 'none';
             return;
         }
@@ -2011,6 +2265,7 @@ function saveToStorage() {
         localStorage.setItem('cyberplan_studentPlan', JSON.stringify(studentPlan));
         localStorage.setItem('cyberplan_placeholderPositions', JSON.stringify(placeholderPositions));
         localStorage.setItem('cyberplan_currentMathCourse', currentMathCourse);
+        saveCompletedCoursesToStorage();
 
         // Generate PDF
         const pdfGenerated = generatePDF();
@@ -2146,6 +2401,36 @@ function generatePDF() {
             doc.text(itText, margin + 5, yPos);
             yPos += lineHeight;
         }
+        
+        // Add completed/transfer courses section if any exist
+        const completedOnly = Array.from(completedCourses).filter(code => {
+            // Only include courses that are not in any semester
+            return !Object.values(studentPlan).some(semesterCourses => semesterCourses.includes(code));
+        });
+        
+        if (completedOnly.length > 0) {
+            // Check if we need a new page
+            if (yPos > pageHeight - 50) {
+                doc.addPage();
+                yPos = 20;
+            }
+            
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text('Completed/Transfer Courses', margin, yPos);
+            yPos += lineHeight;
+            
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+            completedOnly.forEach((courseCode) => {
+                const course = courses[courseCode];
+                if (course) {
+                    const courseText = `${courseCode} - ${course.title} (${course.credits} credits) [Completed/Transfer]`;
+                    doc.text(courseText, margin + 5, yPos);
+                    yPos += lineHeight;
+                }
+            });
+        }
 
         // Save the PDF
         const fileName = `TCC_CyberSecurity_Plan_${new Date().toISOString().split('T')[0]}.pdf`;
@@ -2205,6 +2490,15 @@ function loadFromStorage(showAlert = true) {
             if (savedMathCourse && isValidCourseCode(savedMathCourse)) {
                 currentMathCourse = savedMathCourse;
             }
+            
+            // Load completed courses
+            loadCompletedCoursesFromStorage();
+            
+            // Ensure completedCourses is a Set (in case loading failed)
+            if (!(completedCourses instanceof Set)) {
+                completedCourses = new Set();
+            }
+            
             updateUI();
             if (showAlert) {
                 alert('Plan loaded successfully!');
@@ -2228,19 +2522,21 @@ function loadFromStorage(showAlert = true) {
 }
 
 function resetToDefault() {
-    if (confirm('Reset to the default suggested plan? This will replace your current plan.')) {
+    if (confirm('Reset to the default suggested plan? This will replace your current plan. Completed/transfer course markings will be preserved.')) {
         studentPlan = getDefaultPlan();
         placeholderPositions = {
             humanities: 1,
             it_elective: 4
         };
         currentMathCourse = 'MTH 161'; // Reset to default math course
+        // Note: completedCourses is preserved
+        saveToStorage();
         updateUI();
     }
 }
 
 function clearAll() {
-    if (confirm('Are you sure you want to clear all courses? This cannot be undone.')) {
+    if (confirm('Are you sure you want to clear all courses? This cannot be undone. Completed/transfer course markings will be preserved.')) {
         studentPlan = {
             1: ['SDV 101'], // Default SDV 101 in Semester 1
             2: [],
@@ -2252,6 +2548,8 @@ function clearAll() {
             it_elective: 4
         };
         currentMathCourse = 'MTH 161'; // Reset to default math course
+        // Note: completedCourses is preserved
+        saveToStorage();
 
         // Remove any extra semesters (5+) from the DOM
         const semestersContainer = document.getElementById('semestersContainer');
@@ -2271,6 +2569,63 @@ function clearAll() {
         setTimeout(() => {
             renderCourses();
         }, 0);
+    }
+}
+
+// Toggle course completed/transfer status
+function toggleCourseCompleted(courseCode) {
+    if (completedCourses.has(courseCode)) {
+        // Unmarking as completed - remove from completed set
+        completedCourses.delete(courseCode);
+    } else {
+        // Marking as completed - add to completed set
+        completedCourses.add(courseCode);
+        
+        // Remove course from any semester it's in
+        Object.keys(studentPlan).forEach(semester => {
+            const semesterNum = parseInt(semester);
+            if (studentPlan[semesterNum].includes(courseCode)) {
+                studentPlan[semesterNum] = studentPlan[semesterNum].filter(code => code !== courseCode);
+            }
+        });
+    }
+    
+    // Save to localStorage
+    saveCompletedCoursesToStorage();
+    
+    // Update UI to reflect changes (prerequisites may have changed)
+    updateUI();
+}
+
+// Save completed courses to localStorage
+function saveCompletedCoursesToStorage() {
+    try {
+        localStorage.setItem('cyberplan_completedCourses', JSON.stringify(Array.from(completedCourses)));
+    } catch (e) {
+        console.error('Error saving completed courses:', e);
+    }
+}
+
+// Load completed courses from localStorage
+function loadCompletedCoursesFromStorage() {
+    try {
+        const saved = localStorage.getItem('cyberplan_completedCourses');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) {
+                completedCourses = new Set(parsed);
+            } else {
+                // If it's not an array, reset to empty Set
+                completedCourses = new Set();
+            }
+        } else {
+            // No saved data, ensure it's a Set
+            completedCourses = new Set();
+        }
+    } catch (e) {
+        console.error('Error loading completed courses:', e);
+        // On error, ensure it's still a Set
+        completedCourses = new Set();
     }
 }
 
