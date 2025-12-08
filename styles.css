@@ -1132,6 +1132,91 @@ header h2 {
     color: var(--text-primary);
 }
 
+/* Instructions modal - larger for content */
+.instructions-modal .instructions-content {
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.instructions-text {
+    line-height: 1.6;
+}
+
+.instructions-text h1 {
+    color: var(--accent-primary);
+    font-size: 2em;
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 10px;
+}
+
+.instructions-text h2 {
+    color: var(--accent-primary);
+    font-size: 1.5em;
+    margin-top: 30px;
+    margin-bottom: 15px;
+}
+
+.instructions-text h3 {
+    color: var(--text-primary);
+    font-size: 1.2em;
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+.instructions-text h4 {
+    color: var(--text-primary);
+    font-size: 1.1em;
+    margin-top: 15px;
+    margin-bottom: 8px;
+}
+
+.instructions-text p {
+    margin-bottom: 12px;
+}
+
+.instructions-text ul,
+.instructions-text ol {
+    margin-bottom: 15px;
+    padding-left: 30px;
+}
+
+.instructions-text li {
+    margin-bottom: 8px;
+}
+
+.instructions-text blockquote {
+    background: var(--bg-secondary);
+    border-left: 4px solid var(--accent-primary);
+    padding: 15px 20px;
+    margin: 20px 0;
+    border-radius: 4px;
+}
+
+.instructions-text blockquote p {
+    margin-bottom: 10px;
+}
+
+.instructions-text blockquote h4 {
+    margin-top: 15px;
+    margin-bottom: 10px;
+}
+
+.instructions-text a {
+    color: var(--accent-primary);
+    text-decoration: underline;
+}
+
+.instructions-text a:hover {
+    color: var(--accent-hover);
+}
+
+.instructions-text strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
 @keyframes fadeIn {
     from {
         opacity: 0;

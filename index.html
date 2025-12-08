@@ -23,6 +23,7 @@
         </header>
 
         <nav class="controls" role="toolbar" aria-label="Plan controls">
+            <button id="instructionsBtn" class="btn btn-secondary" aria-label="View instructions">📖 Instructions</button>
             <button id="saveBtn" class="btn btn-primary" disabled aria-label="Create PDF of your completed plan"
                 aria-describedby="saveBtn-desc">
                 Create PDF
@@ -142,6 +143,14 @@
                 <h3 id="mathUpgradeModal-title">Upgrade Math Course</h3>
                 <p>Select a higher level math course to replace MTH 161:</p>
                 <div id="mathUpgradeOptions" role="listbox" aria-label="Available math courses"></div>
+            </div>
+        </div>
+
+        <div id="instructionsModal" class="modal instructions-modal" role="dialog" aria-labelledby="instructionsModal-title"
+            aria-modal="true" aria-hidden="true">
+            <div class="modal-content instructions-content">
+                <button class="close" aria-label="Close instructions dialog">&times;</button>
+                <div id="instructionsContent" class="instructions-text"></div>
             </div>
         </div>
 
