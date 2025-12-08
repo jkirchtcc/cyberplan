@@ -2233,6 +2233,7 @@ function updateSemesterDisplay(semester) {
 
 function updateTotalCredits() {
     let total = 0;
+    // Add credits from courses in semesters
     Object.values(studentPlan).forEach(semesterCourses => {
         semesterCourses.forEach(courseCode => {
             const course = courses[courseCode];
@@ -2241,6 +2242,15 @@ function updateTotalCredits() {
             }
         });
     });
+    // Add credits from completed/transfer courses
+    if (completedCourses instanceof Set) {
+        completedCourses.forEach(courseCode => {
+            const course = courses[courseCode];
+            if (course) {
+                total += course.credits;
+            }
+        });
+    }
     document.getElementById('totalCredits').textContent = total;
 }
 
