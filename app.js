@@ -2233,24 +2233,34 @@ function updateSemesterDisplay(semester) {
 
 function updateTotalCredits() {
     let total = 0;
+    const countedCourses = new Set();
+    
     // Add credits from courses in semesters
     Object.values(studentPlan).forEach(semesterCourses => {
         semesterCourses.forEach(courseCode => {
-            const course = courses[courseCode];
-            if (course) {
-                total += course.credits;
+            if (!countedCourses.has(courseCode)) {
+                const course = courses[courseCode];
+                if (course) {
+                    total += course.credits;
+                    countedCourses.add(courseCode);
+                }
             }
         });
     });
-    // Add credits from completed/transfer courses
+    
+    // Add credits from completed/transfer courses (only if not already counted)
     if (completedCourses instanceof Set) {
         completedCourses.forEach(courseCode => {
-            const course = courses[courseCode];
-            if (course) {
-                total += course.credits;
+            if (!countedCourses.has(courseCode)) {
+                const course = courses[courseCode];
+                if (course) {
+                    total += course.credits;
+                    countedCourses.add(courseCode);
+                }
             }
         });
     }
+    
     document.getElementById('totalCredits').textContent = total;
 }
 
